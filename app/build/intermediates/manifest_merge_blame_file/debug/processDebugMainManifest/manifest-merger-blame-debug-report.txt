@@ -1,0 +1,179 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.sergi.glyphcomposite"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="34"
+9        android:targetSdkVersion="35" />
+10
+11    <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
+11-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:2:5-77
+11-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:2:22-74
+12    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+12-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:3:5-71
+12-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:3:22-68
+13    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+13-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:5-77
+13-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:22-74
+14
+15    <permission
+15-->[androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:22:5-24:47
+16        android:name="com.sergi.glyphcomposite.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+16-->[androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:23:9-81
+17        android:protectionLevel="signature" />
+17-->[androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:24:9-44
+18
+19    <uses-permission android:name="com.sergi.glyphcomposite.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+19-->[androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:26:5-97
+19-->[androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:26:22-94
+20
+21    <application
+21-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:5-22:19
+22        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+22-->[androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:28:18-86
+23        android:debuggable="true"
+24        android:extractNativeLibs="false"
+25        android:label="Glyph Composite"
+25-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:50-81
+26        android:theme="@style/AppTheme" >
+26-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:18-49
+27        <activity
+27-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:6:9-10:20
+28            android:name="com.sergi.glyphcomposite.MainActivity"
+28-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:6:19-47
+29            android:exported="true" >
+29-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:6:48-71
+30            <intent-filter>
+30-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:7:13-9:29
+31                <action android:name="android.intent.action.MAIN" />
+31-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:8:17-69
+31-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:8:25-66
+32
+33                <category android:name="android.intent.category.LAUNCHER" />
+33-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:8:69-129
+33-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:8:79-126
+34            </intent-filter>
+35        </activity>
+36
+37        <service
+37-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:11:9-18:19
+38            android:name="com.sergi.glyphcomposite.CompositeGlyphToyService"
+38-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:11:18-58
+39            android:exported="true"
+39-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:11:59-82
+40            android:label="Glyph Composite" >
+40-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:11:83-114
+41            <intent-filter>
+41-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:12:13-91
+42                <action android:name="com.nothing.glyph.TOY" />
+42-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:12:28-75
+42-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:12:36-72
+43            </intent-filter>
+44
+45            <meta-data
+45-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:13:13-104
+46                android:name="com.nothing.glyph.toy.name"
+46-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:13:24-65
+47                android:resource="@string/toy_name" />
+47-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:13:66-101
+48            <meta-data
+48-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:14:13-110
+49                android:name="com.nothing.glyph.toy.image"
+49-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:14:24-66
+50                android:resource="@drawable/toy_preview" />
+50-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:14:67-107
+51            <meta-data
+51-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:15:13-110
+52                android:name="com.nothing.glyph.toy.summary"
+52-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:15:24-68
+53                android:resource="@string/toy_summary" />
+53-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:15:69-107
+54            <meta-data
+54-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:16:13-91
+55                android:name="com.nothing.glyph.toy.longpress"
+55-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:16:24-70
+56                android:value="1" />
+56-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:16:71-88
+57            <meta-data
+57-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:17:13-93
+58                android:name="com.nothing.glyph.toy.aod_support"
+58-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:17:24-72
+59                android:value="1" />
+59-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:17:73-90
+60        </service>
+61        <service
+61-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:19:9-21:19
+62            android:name="com.sergi.glyphcomposite.GlyphNotificationListener"
+62-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:19:18-59
+63            android:exported="true"
+63-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:19:181-204
+64            android:label="Glyph Composite notifications"
+64-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:19:60-105
+65            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+65-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:19:106-180
+66            <intent-filter>
+66-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:20:13-126
+67                <action android:name="android.service.notification.NotificationListenerService" />
+67-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:20:28-110
+67-->C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:20:36-107
+68            </intent-filter>
+69        </service>
+70
+71        <provider
+71-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:24:9-32:20
+72            android:name="androidx.startup.InitializationProvider"
+72-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:25:13-67
+73            android:authorities="com.sergi.glyphcomposite.androidx-startup"
+73-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:26:13-68
+74            android:exported="false" >
+74-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:27:13-37
+75            <meta-data
+75-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:29:13-31:52
+76                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+76-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:30:17-85
+77                android:value="androidx.startup" />
+77-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:31:17-49
+78        </provider>
+79
+80        <receiver
+80-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:34:9-52:20
+81            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+81-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:35:13-76
+82            android:directBootAware="false"
+82-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:36:13-44
+83            android:enabled="true"
+83-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:37:13-35
+84            android:exported="true"
+84-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:38:13-36
+85            android:permission="android.permission.DUMP" >
+85-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:39:13-57
+86            <intent-filter>
+86-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:40:13-42:29
+87                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+87-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:17-91
+87-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:25-88
+88            </intent-filter>
+89            <intent-filter>
+89-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:43:13-45:29
+90                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+90-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:17-85
+90-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:25-82
+91            </intent-filter>
+92            <intent-filter>
+92-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:46:13-48:29
+93                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+93-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:17-88
+93-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:25-85
+94            </intent-filter>
+95            <intent-filter>
+95-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:49:13-51:29
+96                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+96-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:17-95
+96-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:25-92
+97            </intent-filter>
+98        </receiver>
+99    </application>
+100
+101</manifest>

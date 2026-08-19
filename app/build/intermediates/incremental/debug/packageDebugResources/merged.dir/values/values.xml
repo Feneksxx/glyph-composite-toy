@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Glyph Composite</string>
+    <string name="toy_name">Glyph Composite</string>
+    <string name="toy_summary">Clock, charging, notifications and music on one screen</string>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:colorAccent">#ffffff</item><item name="android:navigationBarColor">#000000</item><item name="android:windowLightStatusBar">false</item><item name="android:statusBarColor">#000000</item></style>
+</resources>

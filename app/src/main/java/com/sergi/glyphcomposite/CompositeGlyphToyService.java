@@ -12,11 +12,11 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.BatteryManager;
 import android.content.IntentFilter;
-import com.nothing.ketchum.glyph.Glyph;
-import com.nothing.ketchum.glyph.GlyphMatrixManager;
-import com.nothing.ketchum.glyph.GlyphMatrixUtils;
-import com.nothing.ketchum.glyph.GlyphMatrixFrame;
-import com.nothing.ketchum.glyph.GlyphMatrixObject;
+import com.nothing.ketchum.Glyph;
+import com.nothing.ketchum.GlyphException;
+import com.nothing.ketchum.GlyphMatrixManager;
+import com.nothing.ketchum.GlyphMatrixFrame;
+import com.nothing.ketchum.GlyphMatrixObject;
 
 public class CompositeGlyphToyService extends android.app.Service {
     private GlyphMatrixManager manager; private final Handler handler = new Handler(Looper.getMainLooper()); private float phase;
@@ -36,6 +36,12 @@ public class CompositeGlyphToyService extends android.app.Service {
         p.setStyle(Paint.Style.FILL); p.setTypeface(Typeface.create(Typeface.MONOSPACE,Typeface.BOLD)); p.setTextSize(4.8f); String t=new java.text.SimpleDateFormat("HH:mm").format(new java.util.Date()); c.drawText(t,2.0f,14.0f,p);
         // Notification pulse on both sides for a short window.
         if(System.currentTimeMillis()-GlyphNotificationListener.lastNotificationAt < 10000 && ((System.currentTimeMillis()/240)%2==0)){ c.drawPoint(1,12,p); c.drawPoint(23,12,p); c.drawPoint(1,13,p); c.drawPoint(23,13,p); }
-        GlyphMatrixObject obj=new GlyphMatrixObject.Builder().setImageSource(b).build(); GlyphMatrixFrame frame=new GlyphMatrixFrame.Builder().addTop(obj).build(this); manager.setMatrixFrame(frame.render());
+        GlyphMatrixObject obj=new GlyphMatrixObject.Builder().setImageSource(b).build();
+        GlyphMatrixFrame frame=new GlyphMatrixFrame.Builder().addTop(obj).build(this);
+        try {
+            manager.setMatrixFrame(frame.render());
+        } catch (GlyphException ignored) {
+            // The system can briefly reject a frame while the Glyph service reconnects.
+        }
     }
 }

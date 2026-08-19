@@ -1,0 +1,15 @@
+com.sergi.glyphcomposite.app-lifecycle-runtime-2.6.2-0 C:\Users\sergi\.gradle\caches\9.3.0\transforms\0001f39e6801d3887b51d702cbfd71e5\workspace\transformed\lifecycle-runtime-2.6.2\res
+com.sergi.glyphcomposite.app-startup-runtime-1.1.1-1 C:\Users\sergi\.gradle\caches\9.3.0\transforms\03b8e6e697552dd451bfb17cfecf3d6c\workspace\transformed\startup-runtime-1.1.1\res
+com.sergi.glyphcomposite.app-core-runtime-2.2.0-2 C:\Users\sergi\.gradle\caches\9.3.0\transforms\072b3c255af1154c1ec8dcd2120d6e06\workspace\transformed\core-runtime-2.2.0\res
+com.sergi.glyphcomposite.app-annotation-experimental-1.4.1-3 C:\Users\sergi\.gradle\caches\9.3.0\transforms\15b5e484448c8bba4e5e23c881b2c71e\workspace\transformed\annotation-experimental-1.4.1\res
+com.sergi.glyphcomposite.app-core-1.15.0-4 C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\res
+com.sergi.glyphcomposite.app-tracing-1.2.0-5 C:\Users\sergi\.gradle\caches\9.3.0\transforms\88d40ecdf360b07973cb362f5cf4ee79\workspace\transformed\tracing-1.2.0\res
+com.sergi.glyphcomposite.app-profileinstaller-1.3.0-6 C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\res
+com.sergi.glyphcomposite.app-glyph-matrix-sdk-2.0-7 C:\Users\sergi\.gradle\caches\9.3.0\transforms\f39c2f7ee0d8b2ecff4476ae7a6b8fec\workspace\transformed\glyph-matrix-sdk-2.0\res
+com.sergi.glyphcomposite.app-pngs-8 C:\Users\sergi\Downloads\glyph-composite-toy\app\build\generated\res\pngs\debug
+com.sergi.glyphcomposite.app-resValues-9 C:\Users\sergi\Downloads\glyph-composite-toy\app\build\generated\res\resValues\debug
+com.sergi.glyphcomposite.app-packageDebugResources-10 C:\Users\sergi\Downloads\glyph-composite-toy\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.sergi.glyphcomposite.app-packageDebugResources-11 C:\Users\sergi\Downloads\glyph-composite-toy\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.sergi.glyphcomposite.app-debug-12 C:\Users\sergi\Downloads\glyph-composite-toy\app\build\intermediates\merged_res\debug\mergeDebugResources
+com.sergi.glyphcomposite.app-debug-13 C:\Users\sergi\Downloads\glyph-composite-toy\app\src\debug\res
+com.sergi.glyphcomposite.app-main-14 C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\res
