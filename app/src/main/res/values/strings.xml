@@ -1,1 +1,18 @@
-<resources><string name="app_name">Glyph Composite</string><string name="toy_name">Glyph Composite</string><string name="toy_summary">Clock, charging, notifications and music on one screen</string></resources>
+<resources>
+    <string name="app_name">Glyph Composite</string>
+    <string name="toy_name">Glyph Composite</string>
+    <string name="toy_summary">Часы, зарядка, уведомления и музыка на одном экране</string>
+    <string name="ui_eyebrow">GLYPH TOY</string>
+    <string name="ui_title">Composite
+Interface</string>
+    <string name="ui_description">Время в центре. Музыка снизу. Зарядка и уведомления появляются только когда нужны.</string>
+    <string name="brightness_master">ОБЩАЯ ЯРКОСТЬ</string>
+    <string name="brightness_clock">ЯРКОСТЬ ЧАСОВ</string>
+    <string name="brightness_music">ЯРКОСТЬ МУЗЫКИ</string>
+    <string name="brightness_battery">ЯРКОСТЬ БАТАРЕИ</string>
+    <string name="brightness_notifications">ЯРКОСТЬ УВЕДОМЛЕНИЙ</string>
+    <string name="brightness_flash">ЯРКОСТЬ МИГАНИЯ</string>
+    <string name="large_clock">БОЛЬШИЕ ЧАСЫ БЕЗ ЗАРЯДКИ</string>
+    <string name="notification_access">РАЗРЕШИТЬ УВЕДОМЛЕНИЯ</string>
+    <string name="open_glyph_toys">ОТКРЫТЬ GLYPH TOYS</string>
+</resources>

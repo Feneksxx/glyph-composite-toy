@@ -1,7 +1,20 @@
 R_DEF: Internal format may change without notice
 local
+drawable app_icon
 drawable toy_preview
 string app_name
+string brightness_battery
+string brightness_clock
+string brightness_flash
+string brightness_master
+string brightness_music
+string brightness_notifications
+string large_clock
+string notification_access
+string open_glyph_toys
 string toy_name
 string toy_summary
+string ui_description
+string ui_eyebrow
+string ui_title
 style AppTheme

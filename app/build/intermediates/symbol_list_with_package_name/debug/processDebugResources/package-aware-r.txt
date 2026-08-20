@@ -45,6 +45,7 @@ dimen notification_small_icon_size_as_large
 dimen notification_subtext_size
 dimen notification_top_pad
 dimen notification_top_pad_large_text
+drawable app_icon
 drawable ic_call_answer
 drawable ic_call_answer_low
 drawable ic_call_answer_video
@@ -152,6 +153,12 @@ layout notification_template_part_chronometer
 layout notification_template_part_time
 string androidx_startup
 string app_name
+string brightness_battery
+string brightness_clock
+string brightness_flash
+string brightness_master
+string brightness_music
+string brightness_notifications
 string call_notification_answer_action
 string call_notification_answer_video_action
 string call_notification_decline_action
@@ -159,6 +166,7 @@ string call_notification_hang_up_action
 string call_notification_incoming_text
 string call_notification_ongoing_text
 string call_notification_screening_text
+string large_clock
 string letter_0
 string letter_0_tall
 string letter_1
@@ -220,9 +228,14 @@ string letter_w
 string letter_x
 string letter_y
 string letter_z
+string notification_access
+string open_glyph_toys
 string status_bar_notification_info_overflow
 string toy_name
 string toy_summary
+string ui_description
+string ui_eyebrow
+string ui_title
 style AppTheme
 style TextAppearance_Compat_Notification
 style TextAppearance_Compat_Notification_Info

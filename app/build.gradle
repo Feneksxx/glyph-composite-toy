@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 
 android { namespace 'com.sergi.glyphcomposite'; compileSdk 35
-    defaultConfig { applicationId 'com.sergi.glyphcomposite'; minSdk 34; targetSdk 35; versionCode 1; versionName '1.0' }
+    defaultConfig { applicationId 'com.sergi.glyphcomposite'; minSdk 34; targetSdk 35; versionCode 4; versionName '1.3' }
 }
 
 dependencies {

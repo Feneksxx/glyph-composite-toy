@@ -1,6 +1,14 @@
 [
     {
-        "merged": "com.sergi.glyphcomposite.app-debug-12:/drawable_toy_preview.xml.flat",
-        "source": "com.sergi.glyphcomposite.app-main-14:/drawable/toy_preview.xml"
+        "merged": "C:\\Users\\sergi\\.gradle\\daemon\\9.3.0\\com.sergi.glyphcomposite.app-debug-12:\\drawable_toy_preview.xml.flat",
+        "source": "C:\\Users\\sergi\\.gradle\\daemon\\9.3.0\\com.sergi.glyphcomposite.app-main-14:\\drawable\\toy_preview.xml"
+    },
+    {
+        "merged": "com.sergi.glyphcomposite.app-debug-12:/drawable_app_icon.xml.flat",
+        "source": "com.sergi.glyphcomposite.app-main-14:/drawable/app_icon.xml"
+    },
+    {
+        "merged": "C:\\Users\\sergi\\.gradle\\daemon\\9.3.0\\com.sergi.glyphcomposite.app-debug-12:\\drawable_app_icon.xml.flat",
+        "source": "C:\\Users\\sergi\\.gradle\\daemon\\9.3.0\\com.sergi.glyphcomposite.app-main-14:\\drawable\\app_icon.xml"
     }
 ]

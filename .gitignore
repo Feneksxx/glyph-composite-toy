@@ -1,0 +1,8 @@
+.gradle/
+.gradle-user-home/
+.idea/
+build/
+*/build/
+local.properties
+*.iml
+app/libs/*.aar

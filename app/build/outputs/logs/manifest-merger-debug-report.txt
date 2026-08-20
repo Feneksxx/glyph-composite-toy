@@ -26,17 +26,13 @@ uses-permission#com.nothing.ketchum.permission.ENABLE
 ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:2:5-77
 	android:name
 		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:2:22-74
-uses-permission#android.permission.RECORD_AUDIO
-ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:3:5-71
-	android:name
-		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:3:22-68
 uses-permission#android.permission.POST_NOTIFICATIONS
-ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:5-77
+ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:3:5-77
 	android:name
-		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:22-74
+		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:3:22-74
 application
-ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:5-22:19
-INJECTED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:5-22:19
+ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:5-22:19
+INJECTED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:5-22:19
 MERGED from [androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:28:5-89
 MERGED from [androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:28:5-89
 MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\a76136deddc546a08240feca9ea71620\workspace\transformed\profileinstaller-1.3.0\AndroidManifest.xml:23:5-53:19
@@ -50,9 +46,13 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\se
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.15.0] C:\Users\sergi\.gradle\caches\9.3.0\transforms\2e090519eb69b5b1f7d7da0f686d7b0d\workspace\transformed\core-1.15.0\AndroidManifest.xml:28:18-86
 	android:label
-		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:50-81
+		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:50-82
+	android:roundIcon
+		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:43-81
+	android:icon
+		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:9-42
 	android:theme
-		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:5:18-49
+		ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:4:18-49
 activity#com.sergi.glyphcomposite.MainActivity
 ADDED from C:\Users\sergi\Downloads\glyph-composite-toy\app\src\main\AndroidManifest.xml:6:9-10:20
 	android:exported
