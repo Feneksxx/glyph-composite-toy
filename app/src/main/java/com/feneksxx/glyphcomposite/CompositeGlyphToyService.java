@@ -1,4 +1,4 @@
-package com.sergi.glyphcomposite;
+package com.feneksxx.glyphcomposite;
 
 import android.app.Service;
 import android.content.ComponentName;

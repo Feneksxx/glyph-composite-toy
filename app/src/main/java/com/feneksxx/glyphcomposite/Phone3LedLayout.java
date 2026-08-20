@@ -1,4 +1,4 @@
-package com.sergi.glyphcomposite;
+package com.feneksxx.glyphcomposite;
 
 import java.util.Collections;
 import java.util.HashSet;

@@ -6,3 +6,7 @@ build/
 local.properties
 *.iml
 app/libs/*.aar
+
+# Keep only the final Playground preview in the repository.
+release/*preview*.png
+!release/glyph-composite-toy-preview-512-project.png
