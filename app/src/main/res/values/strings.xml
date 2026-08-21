@@ -6,6 +6,10 @@
     <string name="ui_title">Composite
 Interface</string>
     <string name="ui_description">Время в центре. Музыка снизу. Зарядка и уведомления появляются только когда нужны.</string>
+    <string name="language_title">ЯЗЫК ПРИЛОЖЕНИЯ</string>
+    <string name="language_system">ПО СИСТЕМЕ</string>
+    <string name="language_russian">РУССКИЙ</string>
+    <string name="language_english">ENGLISH</string>
     <string name="brightness_master">ОБЩАЯ ЯРКОСТЬ</string>
     <string name="brightness_clock">ЯРКОСТЬ ЧАСОВ</string>
     <string name="brightness_music">ЯРКОСТЬ МУЗЫКИ</string>
@@ -15,4 +19,17 @@ Interface</string>
     <string name="large_clock">БОЛЬШИЕ ЧАСЫ БЕЗ ЗАРЯДКИ</string>
     <string name="notification_access">РАЗРЕШИТЬ УВЕДОМЛЕНИЯ</string>
     <string name="open_glyph_toys">ОТКРЫТЬ GLYPH TOYS</string>
+    <string name="profiles_title">ПРОФИЛЬ</string>
+    <string name="profile_minimal">МИНИМАЛ</string>
+    <string name="profile_nothing">NOTHING</string>
+    <string name="profile_bright">ЯРКИЙ</string>
+    <string name="clock_font">ШРИФТ ЧАСОВ</string>
+    <string name="font_classic">ПО УМОЛЧАНИЮ</string>
+    <string name="font_thin">ТОЧЕЧНЫЙ</string>
+    <string name="visualizer_enabled">ВКЛЮЧИТЬ ВИЗУАЛАЙЗЕР</string>
+    <string name="visualizer_style">СТИЛЬ ВИЗУАЛАЙЗЕРА</string>
+    <string name="visualizer_wave">ВОЛНА</string>
+    <string name="visualizer_pulse">ПУЛЬС</string>
+    <string name="visualizer_speed">СКОРОСТЬ</string>
+    <string name="author_credit">Created by @feneksx</string>
 </resources>

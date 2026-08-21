@@ -7,10 +7,10 @@
         android:fillColor="#000000"
         android:pathData="M54,4a50,50 0,1 0,0 100a50,50 0,1 0,0 -100z" />
 
-    <!-- Clean outer Glyph ring. -->
+    <!-- Evenly spaced 16-point Glyph ring, centred on (54,54). -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M49,10h4v4h-4zM55,10h4v4h-4zM42,13h4v4h-4zM62,13h4v4h-4zM28,20h4v4h-4zM76,20h4v4h-4zM20,28h4v4h-4zM84,28h4v4h-4zM13,42h4v4h-4zM91,42h4v4h-4zM13,52h4v4h-4zM91,52h4v4h-4zM20,68h4v4h-4zM84,68h4v4h-4zM28,80h4v4h-4zM76,80h4v4h-4zM42,90h4v4h-4zM62,90h4v4h-4zM49,94h4v4h-4zM55,94h4v4h-4z" />
+        android:pathData="M51,12h6v6h-6zM66,15h6v6h-6zM79,23h6v6h-6zM87,36h6v6h-6zM90,51h6v6h-6zM87,66h6v6h-6zM79,79h6v6h-6zM66,87h6v6h-6zM51,90h6v6h-6zM36,87h6v6h-6zM23,79h6v6h-6zM15,66h6v6h-6zM12,51h6v6h-6zM15,36h6v6h-6zM23,23h6v6h-6zM36,15h6v6h-6z" />
 
     <!-- Minimal clock, isolated from the battery and visualizer. -->
     <path

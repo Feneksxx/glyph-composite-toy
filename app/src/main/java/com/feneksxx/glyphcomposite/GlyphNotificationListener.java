@@ -10,10 +10,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Flashes a new notification, then keeps a quiet dot until that notification is removed. */
 public class GlyphNotificationListener extends NotificationListenerService {
     private static volatile long latestNotificationAt = 0L;
+    private static volatile long notificationExitAt = 0L;
     private static volatile String latestNotificationKey;
     private static final Set<String> ACTIVE_NOTIFICATION_KEYS =
             ConcurrentHashMap.newKeySet();
     private static final long FLASH_WINDOW_MS = 10000L;
+    private static final long TRANSITION_MS = 900L;
+    private static final long EXIT_FADE_MS = 700L;
 
     @Override public void onListenerConnected() {
         StatusBarNotification[] active = getActiveNotifications();
@@ -27,6 +30,7 @@ public class GlyphNotificationListener extends NotificationListenerService {
         if (!isRelevantNotification(sbn)) return;
         ACTIVE_NOTIFICATION_KEYS.add(sbn.getKey());
         latestNotificationAt = System.currentTimeMillis();
+        notificationExitAt = 0L;
         latestNotificationKey = sbn.getKey();
     }
 
@@ -34,7 +38,7 @@ public class GlyphNotificationListener extends NotificationListenerService {
         ACTIVE_NOTIFICATION_KEYS.remove(sbn.getKey());
         if (sbn.getKey().equals(latestNotificationKey)) {
             latestNotificationKey = null;
-            latestNotificationAt = 0L;
+            notificationExitAt = System.currentTimeMillis();
         }
     }
 
@@ -49,14 +53,36 @@ public class GlyphNotificationListener extends NotificationListenerService {
     }
 
     static boolean shouldShowNotificationFlash() {
-        long elapsed = System.currentTimeMillis() - latestNotificationAt;
-        if (ACTIVE_NOTIFICATION_KEYS.isEmpty() || elapsed < 0 || elapsed >= FLASH_WINDOW_MS) return false;
-        return true;
+        return notificationFlashAlpha() > 0f;
     }
 
     static boolean shouldShowNotificationDot() {
+        return notificationDotAlpha() > 0f;
+    }
+
+    static float notificationFlashAlpha() {
+        long now = System.currentTimeMillis();
+        if (ACTIVE_NOTIFICATION_KEYS.isEmpty()) {
+            if (notificationExitAt == 0L) return 0f;
+            float exit = (now - notificationExitAt) / (float) EXIT_FADE_MS;
+            return exit >= 1f ? 0f : Math.max(0f, 1f - exit);
+        }
+        if (latestNotificationAt == 0L) return 0f;
+        long elapsed = now - latestNotificationAt;
+        if (elapsed < 0L || elapsed >= FLASH_WINDOW_MS + TRANSITION_MS) return 0f;
+        if (elapsed < FLASH_WINDOW_MS) return 1f;
+        return 1f - (elapsed - FLASH_WINDOW_MS) / (float) TRANSITION_MS;
+    }
+
+    static float notificationDotAlpha() {
+        if (ACTIVE_NOTIFICATION_KEYS.isEmpty()) return 0f;
+        if (latestNotificationAt == 0L) return 1f;
         long elapsed = System.currentTimeMillis() - latestNotificationAt;
-        return !ACTIVE_NOTIFICATION_KEYS.isEmpty() && elapsed >= FLASH_WINDOW_MS;
+        if (elapsed < FLASH_WINDOW_MS) return 0f;
+        if (elapsed < FLASH_WINDOW_MS + TRANSITION_MS) {
+            return (elapsed - FLASH_WINDOW_MS) / (float) TRANSITION_MS;
+        }
+        return 1f;
     }
 
 }

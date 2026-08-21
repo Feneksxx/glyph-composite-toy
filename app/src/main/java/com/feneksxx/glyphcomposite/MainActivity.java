@@ -1,15 +1,19 @@
 package com.feneksxx.glyphcomposite;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -17,6 +21,13 @@ import android.widget.Space;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
+import android.text.SpannableString;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
+
+import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "glyph_composite";
@@ -27,9 +38,27 @@ public class MainActivity extends Activity {
     private static final String NOTIFICATION_FLASH_BRIGHTNESS = "notification_flash_brightness";
     private static final String MASTER_BRIGHTNESS = "master_brightness";
     private static final String LARGE_CLOCK = "large_clock";
+    private static final String CLOCK_FONT = "clock_font";
+    private static final String VISUALIZER_ENABLED = "visualizer_enabled";
+    private static final String VISUALIZER_STYLE = "visualizer_style";
+    private static final String VISUALIZER_SPEED = "visualizer_speed";
+    private static final String LANGUAGE = "language";
+    private static final String LANGUAGE_SYSTEM = "system";
     private static final String SETTINGS_VERSION = "settings_version";
     private static final int DEFAULT_BRIGHTNESS = 120;
     private static final int DEFAULT_MASTER_BRIGHTNESS = 180;
+
+    @Override protected void attachBaseContext(Context base) {
+        String language = base.getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getString(LANGUAGE, LANGUAGE_SYSTEM);
+        if (LANGUAGE_SYSTEM.equals(language)) {
+            super.attachBaseContext(base);
+            return;
+        }
+        Configuration configuration = new Configuration(base.getResources().getConfiguration());
+        configuration.setLocale(new Locale(language));
+        super.attachBaseContext(base.createConfigurationContext(configuration));
+    }
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -44,10 +73,6 @@ public class MainActivity extends Activity {
         root.setPadding(dp(24), dp(28), dp(24), dp(24));
         root.setBackgroundColor(Color.BLACK);
 
-        TextView eyebrow = text(getString(R.string.ui_eyebrow), 12, Color.rgb(150, 150, 150));
-        eyebrow.setLetterSpacing(0.14f);
-        root.addView(eyebrow);
-
         TextView title = text(getString(R.string.ui_title), 32, Color.WHITE);
         title.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -56,6 +81,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
         descriptionParams.topMargin = dp(16);
         root.addView(description, descriptionParams);
+
+        addLanguageControl(root, preferences);
 
         Space space = new Space(this);
         root.addView(space, new LinearLayout.LayoutParams(1, dp(22)));
@@ -66,6 +93,9 @@ public class MainActivity extends Activity {
         addBrightnessControl(root, preferences, getString(R.string.brightness_battery), BATTERY_BRIGHTNESS, DEFAULT_BRIGHTNESS);
         addBrightnessControl(root, preferences, getString(R.string.brightness_notifications), NOTIFICATION_BRIGHTNESS, DEFAULT_BRIGHTNESS);
         addBrightnessControl(root, preferences, getString(R.string.brightness_flash), NOTIFICATION_FLASH_BRIGHTNESS, DEFAULT_BRIGHTNESS);
+
+        addClockFontControl(root, preferences);
+        addVisualizerControls(root, preferences);
 
         LinearLayout clockMode = card();
         Switch largeClock = new Switch(this);
@@ -96,10 +126,129 @@ public class MainActivity extends Activity {
         });
         root.addView(manager, managerParams);
 
+        TextView credit = text(getString(R.string.author_credit), 12, Color.rgb(135, 135, 135));
+        credit.setGravity(Gravity.CENTER);
+        SpannableString creditText = new SpannableString(getString(R.string.author_credit));
+        String handle = "@feneksx";
+        int handleStart = creditText.toString().indexOf(handle);
+        if (handleStart >= 0) {
+            creditText.setSpan(new ClickableSpan() {
+                @Override public void onClick(View widget) {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FeneksX")));
+                }
+            }, handleStart, handleStart + handle.length(), SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        credit.setText(creditText);
+        credit.setMovementMethod(LinkMovementMethod.getInstance());
+        credit.setHighlightColor(Color.TRANSPARENT);
+        LinearLayout.LayoutParams creditParams = new LinearLayout.LayoutParams(-1, -2);
+        creditParams.topMargin = dp(18);
+        root.addView(credit, creditParams);
+
         ScrollView scrollView = new ScrollView(this);
         scrollView.setBackgroundColor(Color.BLACK);
         scrollView.addView(root);
         setContentView(scrollView);
+    }
+
+    private void addLanguageControl(LinearLayout root, SharedPreferences preferences) {
+        LinearLayout box = card();
+        TextView title = text(getString(R.string.language_title), 12, Color.rgb(175, 175, 175));
+        title.setLetterSpacing(0.10f);
+        box.addView(title);
+
+        Spinner spinner = new Spinner(this);
+        String[] languages = {
+                getString(R.string.language_system),
+                getString(R.string.language_russian),
+                getString(R.string.language_english)
+        };
+        spinner.setAdapter(new ArrayAdapter<String>(
+                this, android.R.layout.simple_spinner_dropdown_item, languages));
+        String saved = preferences.getString(LANGUAGE, LANGUAGE_SYSTEM);
+        int selected = LANGUAGE_SYSTEM.equals(saved) ? 0 : ("ru".equals(saved) ? 1 : 2);
+        spinner.setSelection(selected);
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent,
+                    android.view.View view, int position, long id) {
+                String value = position == 0 ? LANGUAGE_SYSTEM : (position == 1 ? "ru" : "en");
+                if (!value.equals(preferences.getString(LANGUAGE, LANGUAGE_SYSTEM))) {
+                    preferences.edit().putString(LANGUAGE, value).apply();
+                    recreate();
+                }
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
+        box.addView(spinner, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(12);
+        root.addView(box, params);
+    }
+
+    private void addClockFontControl(LinearLayout root, SharedPreferences preferences) {
+        LinearLayout box = card();
+        TextView title = text(getString(R.string.clock_font), 12, Color.rgb(175, 175, 175));
+        title.setLetterSpacing(0.10f);
+        box.addView(title);
+        Spinner spinner = new Spinner(this);
+        String[] fonts = {getString(R.string.font_classic), getString(R.string.font_thin)};
+        spinner.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, fonts));
+        spinner.setSelection(Math.min(1, preferences.getInt(CLOCK_FONT, 0)));
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
+                preferences.edit().putInt(CLOCK_FONT, position).apply();
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
+        box.addView(spinner, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(8);
+        root.addView(box, params);
+    }
+
+    private void addVisualizerControls(LinearLayout root, SharedPreferences preferences) {
+        LinearLayout box = card();
+        Switch enabled = new Switch(this);
+        enabled.setText(getString(R.string.visualizer_enabled));
+        enabled.setTextColor(Color.WHITE);
+        enabled.setChecked(preferences.getBoolean(VISUALIZER_ENABLED, true));
+        enabled.setOnCheckedChangeListener((button, checked) -> preferences.edit().putBoolean(VISUALIZER_ENABLED, checked).apply());
+        box.addView(enabled);
+        TextView styleTitle = text(getString(R.string.visualizer_style), 12, Color.rgb(175, 175, 175));
+        box.addView(styleTitle);
+        Spinner style = new Spinner(this);
+        String[] styles = {getString(R.string.visualizer_wave), getString(R.string.visualizer_pulse)};
+        style.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, styles));
+        style.setSelection(Math.min(1, preferences.getInt(VISUALIZER_STYLE, 0)));
+        style.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
+                preferences.edit().putInt(VISUALIZER_STYLE, position).apply();
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
+        box.addView(style, new LinearLayout.LayoutParams(-1, -2));
+        addPreferenceSlider(box, preferences, getString(R.string.visualizer_speed), VISUALIZER_SPEED, 50, 200, 100);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(8);
+        root.addView(box, params);
+    }
+
+    private void addPreferenceSlider(LinearLayout root, SharedPreferences p, String label, String key, int min, int max, int def) {
+        TextView value = text("", 16, Color.WHITE);
+        TextView title = text(label, 12, Color.rgb(175, 175, 175));
+        LinearLayout row = new LinearLayout(this);
+        row.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(value);
+        root.addView(row);
+        SeekBar bar = new SeekBar(this);
+        int saved = Math.max(min, Math.min(max, p.getInt(key, def)));
+        bar.setMax(max - min); bar.setProgress(saved - min); value.setText(saved + "%");
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar b, int progress, boolean fromUser) { int v = progress + min; value.setText(v + "%"); p.edit().putInt(key, v).apply(); }
+            @Override public void onStartTrackingTouch(SeekBar b) { }
+            @Override public void onStopTrackingTouch(SeekBar b) { }
+        });
+        root.addView(bar);
     }
 
     private LinearLayout card() {

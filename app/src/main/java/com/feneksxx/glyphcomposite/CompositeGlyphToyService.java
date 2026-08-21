@@ -32,6 +32,10 @@ public class CompositeGlyphToyService extends Service {
     private static final String NOTIFICATION_FLASH_BRIGHTNESS = "notification_flash_brightness";
     private static final String MASTER_BRIGHTNESS = "master_brightness";
     private static final String LARGE_CLOCK = "large_clock";
+    private static final String CLOCK_FONT = "clock_font";
+    private static final String VISUALIZER_ENABLED = "visualizer_enabled";
+    private static final String VISUALIZER_STYLE = "visualizer_style";
+    private static final String VISUALIZER_SPEED = "visualizer_speed";
     private static final String SETTINGS_VERSION = "settings_version";
     private static final int DEFAULT_BRIGHTNESS = 120;
     private static final int DEFAULT_MASTER_BRIGHTNESS = 180;
@@ -54,13 +58,14 @@ public class CompositeGlyphToyService extends Service {
     private SharedPreferences preferences;
     private float visualizerEnvelope = 0f;
     private long visualizerStartNanos = 0L;
+    private final float[] visualizerLevels = new float[7];
     private int lastMusicVolume = -1;
     private long volumeIndicatorUntil = 0L;
 
     private final Runnable loop = new Runnable() {
         @Override public void run() {
             renderFrame();
-            handler.postDelayed(this, 80);
+            handler.postDelayed(this, nextFrameDelayMs());
         }
     };
 
@@ -105,17 +110,22 @@ public class CompositeGlyphToyService extends Service {
                 : battery.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
         boolean charging = batteryStatus == BatteryManager.BATTERY_STATUS_CHARGING
                 || batteryStatus == BatteryManager.BATTERY_STATUS_FULL;
+        boolean largeClockEnabled = preferences == null
+                || preferences.getBoolean(LARGE_CLOCK, true);
         drawClock(canvas, charging);
-        if (charging) drawBattery(canvas, level, true);
+        if (charging || !largeClockEnabled) drawBattery(canvas, level, charging);
         else drawBatteryLevelLine(canvas, level);
 
         updateVolumeIndicator();
         drawVolumeIndicator(canvas);
 
-        if (GlyphNotificationListener.shouldShowNotificationFlash()) {
-            drawNotificationFlash(canvas, brightness(NOTIFICATION_FLASH_BRIGHTNESS));
-        } else if (GlyphNotificationListener.shouldShowNotificationDot()) {
-            drawPixel(canvas, 12, 4, brightness(NOTIFICATION_BRIGHTNESS));
+        float flashAlpha = GlyphNotificationListener.notificationFlashAlpha();
+        if (flashAlpha > 0f) {
+            drawNotificationFlash(canvas, Math.round(brightness(NOTIFICATION_FLASH_BRIGHTNESS) * flashAlpha));
+        }
+        float dotAlpha = GlyphNotificationListener.notificationDotAlpha();
+        if (dotAlpha > 0f) {
+            drawPixel(canvas, 12, 4, Math.round(brightness(NOTIFICATION_BRIGHTNESS) * dotAlpha));
         }
 
         GlyphMatrixObject object = new GlyphMatrixObject.Builder()
@@ -130,16 +140,46 @@ public class CompositeGlyphToyService extends Service {
         }
     }
 
+    /**
+     * Adaptive refresh keeps animations smooth only while something is moving.
+     * An idle clock does not need an 80 ms render loop and can sleep almost a
+     * full second between frames, reducing wakeups and battery use.
+     */
+    private long nextFrameDelayMs() {
+        boolean visualizerEnabled = preferences == null
+                || preferences.getBoolean(VISUALIZER_ENABLED, true);
+        if (visualizerEnabled && audioManager != null && audioManager.isMusicActive()) return 80L;
+        if (visualizerEnabled && visualizerEnvelope >= 0.02f) return 80L;
+        if (GlyphNotificationListener.shouldShowNotificationFlash()) return 80L;
+        if (System.currentTimeMillis() < volumeIndicatorUntil) return 80L;
+
+        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        int status = battery == null ? 0 : battery.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
+        boolean charging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                || status == BatteryManager.BATTERY_STATUS_FULL;
+        if (charging) return 120L;
+
+        // The clock and a stable notification dot only need a slow refresh.
+        return 900L;
+    }
+
     private void drawMusicVisualizer(Canvas canvas) {
+        if (preferences != null && !preferences.getBoolean(VISUALIZER_ENABLED, true)) {
+            visualizerEnvelope = 0f;
+            return;
+        }
         boolean playing = audioManager != null && audioManager.isMusicActive();
         float target = playing ? 1f : 0f;
         visualizerEnvelope += (target - visualizerEnvelope)
-                * (target > visualizerEnvelope ? 0.30f : 0.10f);
+                * (target > visualizerEnvelope ? 0.30f : 0.28f);
         if (visualizerEnvelope < 0.02f) return;
 
         if (visualizerStartNanos == 0L) visualizerStartNanos = System.nanoTime();
-        double seconds = (System.nanoTime() - visualizerStartNanos) / 1_000_000_000.0;
+        double speed = preferences == null ? 1.0
+                : Math.max(0.5, Math.min(2.0, preferences.getInt(VISUALIZER_SPEED, 100) / 100.0));
+        double seconds = (System.nanoTime() - visualizerStartNanos) / 1_000_000_000.0 * speed;
         int baseIntensity = brightness(MUSIC_BRIGHTNESS);
+        int style = preferences == null ? 0 : preferences.getInt(VISUALIZER_STYLE, 0);
         // A stable dim ribbon follows the real lower arc of the matrix.
         // Seven fixed equalizer bars read clearly as music and never spawn randomly.
         int[] bars = {6, 8, 10, 12, 14, 16, 18};
@@ -150,20 +190,73 @@ public class CompositeGlyphToyService extends Service {
                 if (Phone3LedLayout.isValid(x, y)) available++;
             }
             if (available == 0) continue;
-            float primary = 0.5f + 0.5f
-                    * (float) Math.sin(seconds * 8.6 + i * 1.05);
-            float secondary = 0.5f + 0.5f
-                    * (float) Math.sin(seconds * 4.3 + i * 0.67 + 1.2);
+            float primary = 0.5f + 0.5f * (float) Math.sin(seconds * 8.6 + i * 1.05);
+            float secondary = 0.5f + 0.5f * (float) Math.sin(seconds * 4.3 + i * 0.67 + 1.2);
             float beat = 0.5f + 0.5f * (float) Math.sin(seconds * 12.5);
-            float level = (0.08f + primary * 0.64f + secondary * 0.18f + beat * 0.10f)
-                    * visualizerEnvelope;
-            int height = Math.max(1, Math.min(available, (int) Math.ceil(level * available)));
+            float level;
+            if (style == 1) {
+                // Pulse: two matching wave fronts travel from the centre to
+                // the outer bars, then return. A slightly eased triangle path
+                // makes the fronts leave the centre immediately, removing the
+                // perceptual pause at the end of each return.
+                float phase = (float) ((seconds * 3.40) % 6.0);
+                float folded = phase <= 3f ? phase / 3f : (6f - phase) / 3f;
+                float offset = 3f * (float) Math.pow(
+                        Math.max(0f, Math.min(1f, folded)), 0.68f);
+                float leftDistance = Math.abs(i - (3f - offset));
+                float rightDistance = Math.abs(i - (3f + offset));
+                float front = Math.max(
+                        (float) Math.exp(-(leftDistance * leftDistance) / 0.58f),
+                        (float) Math.exp(-(rightDistance * rightDistance) / 0.58f));
+                float trail = Math.max(
+                        (float) Math.exp(-(leftDistance * leftDistance) / 2.20f),
+                        (float) Math.exp(-(rightDistance * rightDistance) / 2.20f));
+                level = 0.05f + trail * 0.19f + front * 0.74f;
+            } else {
+                // Wave keeps the original movement and timing. The only
+                // visual refinement is the fractional top pixel below,
+                // which creates a soft trailing fade without changing the
+                // style's actual motion or height pattern.
+                level = 0.08f + primary * 0.64f + secondary * 0.18f + beat * 0.10f;
+            }
+            level *= visualizerEnvelope;
             int intensity = Math.min(255, baseIntensity
                     + Math.round(55f * level));
+            if (style == 1) {
+                // A fractional top pixel gives the pulse a visually smooth
+                // height transition instead of jumping one whole LED at once.
+                float pixelHeight = Math.max(0f, Math.min(available, level * available));
+                int solidPixels = (int) Math.floor(pixelHeight);
+                float fractional = pixelHeight - solidPixels;
+                int lit = 0;
+                for (int y = 21; y <= 24; y++) {
+                    if (!Phone3LedLayout.isValid(x, y)) continue;
+                    if (lit < solidPixels) {
+                        drawPixel(canvas, x, y, intensity);
+                    } else if (lit == solidPixels && fractional > 0.02f) {
+                        int softIntensity = Math.max(1,
+                                Math.round(intensity * (0.16f + fractional * 0.84f)));
+                        drawPixel(canvas, x, y, softIntensity);
+                    }
+                    lit++;
+                }
+                continue;
+            }
+            // Wave also uses a fractional top pixel: the leading edge fades
+            // smoothly while the lower pixels remain solid and readable.
+            float pixelHeight = Math.max(0.25f, Math.min(available, level * available));
+            int solidPixels = (int) Math.floor(pixelHeight);
+            float fractional = pixelHeight - solidPixels;
             int lit = 0;
-            for (int y = 21; y <= 24 && lit < height; y++) {
+            for (int y = 24; y >= 21; y--) {
                 if (Phone3LedLayout.isValid(x, y)) {
-                    drawPixel(canvas, x, y, intensity);
+                    if (lit < solidPixels) {
+                        drawPixel(canvas, x, y, intensity);
+                    } else if (lit == solidPixels && fractional > 0.02f) {
+                        int softIntensity = Math.max(1,
+                                Math.round(intensity * (0.14f + fractional * 0.86f)));
+                        drawPixel(canvas, x, y, softIntensity);
+                    }
                     lit++;
                 }
             }
@@ -200,16 +293,23 @@ public class CompositeGlyphToyService extends Service {
         int intensity = brightness(CLOCK_BRIGHTNESS);
         boolean large = !charging && preferences != null
                 && preferences.getBoolean(LARGE_CLOCK, true);
-        if (large) drawLargePixelText(canvas, time, 4, 9, intensity);
-        else drawPixelText(canvas, time, 4, 7, intensity);
+        int startX = 4;
+        if (large) drawLargePixelText(canvas, time, startX, 9, intensity);
+        else drawPixelText(canvas, time, startX, 7, intensity);
     }
 
     private void drawBattery(Canvas canvas, int level, boolean charging) {
         int left = 8, right = 16, top = 14, bottom = 18;
         int intensity = brightness(BATTERY_BRIGHTNESS);
         double seconds = (System.nanoTime() - visualizerStartNanos) / 1_000_000_000.0;
-        int pulse = Math.round(35f * (0.5f + 0.5f * (float) Math.sin(seconds * Math.PI * 2.0)));
-        int outline = Math.min(255, intensity + pulse);
+        // During normal discharge the battery outline is static. Only the
+        // charging states are allowed to animate below.
+        int outline = intensity;
+        if (charging) {
+            int pulse = Math.round(35f
+                    * (0.5f + 0.5f * (float) Math.sin(seconds * Math.PI * 2.0)));
+            outline = Math.min(255, intensity + pulse);
+        }
         for (int x = left; x <= right; x++) { drawPixel(canvas, x, top, outline); drawPixel(canvas, x, bottom, outline); }
         for (int y = top; y <= bottom; y++) { drawPixel(canvas, left, y, outline); drawPixel(canvas, right, y, outline); }
         drawPixel(canvas, 17, 15, outline);
@@ -286,28 +386,34 @@ public class CompositeGlyphToyService extends Service {
         // animations, so they never become a permanent second volume row.
         long now = System.currentTimeMillis();
         if (current == 0) {
-            // Muted: a quiet pulse travels from the centre to both ends and
-            // fades, like a signal with no output rather than a volume bar.
-            float phase = (now % 1200L) / 1200f;
-            float travel = phase < 0.5f ? phase * 2f : (1f - phase) * 2f;
-            float radius = travel * 3f;
+            // Muted: a compact, slow breath at the centre. It never lights
+            // the whole edge, so zero volume reads as silence immediately.
+            float phase = (now % 1500L) / 1500f;
+            float breath = 0.5f - 0.5f * (float) Math.cos(phase * Math.PI * 2.0);
+            float radius = 0.15f + breath * 1.85f;
             for (int y = 9; y <= 15; y++) {
-                float wave = Math.max(0f, 1f - Math.abs(Math.abs(y - 12) - radius) * 1.45f);
-                float amount = 0.08f + wave * 0.70f;
+                float distance = Math.abs(y - 12);
+                float ring = (float) Math.exp(-((distance - radius) * (distance - radius)) / 0.42f);
+                float centre = (float) Math.exp(-(distance * distance) / 0.80f);
+                float amount = 0.04f + ring * 0.42f + centre * (0.22f * (1f - breath));
                 int edgeIntensity = Math.round(dim + (bright - dim) * amount);
                 drawPixel(canvas, 0, y, edgeIntensity);
                 drawPixel(canvas, 24, y, edgeIntensity);
             }
         } else if (current >= max) {
-            // Maximum: both edge lines stay present while a symmetric peak
-            // travels centre -> ends -> centre.
-            float phase = (now % 1400L) / 1400f;
-            float travel = phase < 0.5f ? phase * 2f : (1f - phase) * 2f;
+            // Maximum: the complete seven-pixel edge line remains visible;
+            // a bright symmetric crest sweeps out from the centre and returns.
+            float phase = (now % 1800L) / 1800f;
+            float travel = phase < 0.5f ? phase * 2f : 2f - phase * 2f;
             float radius = travel * 3f;
             for (int y = 9; y <= 15; y++) {
-                float peak = Math.max(0f, 1f - Math.abs(Math.abs(y - 12) - radius) * 1.55f);
-                float amount = 0.20f + peak * 0.80f;
-                int edgeIntensity = Math.min(255, Math.round(dim + (bright - dim) * amount));
+                float distance = Math.abs(y - 12);
+                float crest = (float) Math.exp(-((distance - radius) * (distance - radius)) / 0.55f);
+                float shimmer = 0.05f * (0.5f + 0.5f
+                        * (float) Math.sin(phase * Math.PI * 2.0));
+                float amount = 0.34f + shimmer + crest * 0.66f;
+                int edgeIntensity = Math.min(255,
+                        Math.round(dim + (bright - dim) * amount));
                 drawPixel(canvas, 0, y, edgeIntensity);
                 drawPixel(canvas, 24, y, edgeIntensity);
             }
@@ -324,10 +430,12 @@ public class CompositeGlyphToyService extends Service {
                 x += 2;
                 continue;
             }
-            int[] rows = DIGITS[character - '0'];
+            int style = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
+            int[] rows = fontRows(character - '0');
+            int width = 3;
             for (int row = 0; row < 5; row++) {
-                for (int column = 0; column < 3; column++) {
-                    if ((rows[row] & (1 << (2 - column))) != 0) drawPixel(canvas, x + column, startY + row, intensity);
+                for (int column = 0; column < width; column++) {
+                    if ((rows[row] & (1 << (width - 1 - column))) != 0) drawPixel(canvas, x + column, startY + row, intensity);
                 }
             }
             x += 4;
@@ -344,10 +452,13 @@ public class CompositeGlyphToyService extends Service {
                 x += 2;
                 continue;
             }
-            int[] rows = LARGE_DIGITS[character - '0'];
+            int style = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
+            int[] rows = fontRows(character - '0');
+            int width = 3;
             for (int row = 0; row < 7; row++) {
-                for (int column = 0; column < 3; column++) {
-                    if ((rows[row] & (1 << (2 - column))) != 0) {
+                for (int column = 0; column < width; column++) {
+                    int sourceRow = Math.min(4, Math.round(row * 4f / 6f));
+                    if ((rows[sourceRow] & (1 << (width - 1 - column))) != 0) {
                         drawPixel(canvas, x + column, startY + row, intensity);
                     }
                 }
@@ -355,6 +466,25 @@ public class CompositeGlyphToyService extends Service {
             x += 4;
         }
     }
+
+    private int[] fontRows(int digit) {
+        int style = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
+        if (style == 1) return DOT_DIGITS[digit];
+        return DIGITS[digit];
+    }
+
+    private static final int[][] MINIMAL_DIGITS = {
+        {7,5,5,5,7}, {2,2,2,2,2}, {7,1,7,4,7}, {7,1,7,1,7}, {5,5,7,1,1},
+        {7,4,7,1,7}, {7,4,7,5,7}, {7,1,1,1,1}, {7,5,7,5,7}, {7,5,7,1,7}
+    };
+    private static final int[][] THIN_DIGITS = {
+        {2,5,5,5,2}, {2,6,2,2,7}, {6,1,2,4,7}, {6,1,2,1,6}, {5,5,7,1,1},
+        {7,4,6,1,6}, {2,4,6,5,2}, {7,1,2,2,2}, {2,5,2,5,2}, {2,5,3,1,2}
+    };
+    private static final int[][] DOT_DIGITS = {
+        {2,5,5,5,2}, {2,2,2,2,2}, {6,1,2,4,3}, {6,1,2,1,6}, {5,5,7,1,1},
+        {7,4,6,1,6}, {2,4,6,5,2}, {7,1,2,2,2}, {2,5,2,5,2}, {2,5,3,1,2}
+    };
 
     private void drawPixel(Canvas canvas, int x, int y) {
         drawPixel(canvas, x, y, brightness(CLOCK_BRIGHTNESS));

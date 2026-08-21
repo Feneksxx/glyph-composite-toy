@@ -6,6 +6,10 @@
     <string name="ui_title">Composite
 Interface</string>
     <string name="ui_description">Time in the center. Music below. Charging and notifications appear only when needed.</string>
+    <string name="language_title">APP LANGUAGE</string>
+    <string name="language_system">SYSTEM DEFAULT</string>
+    <string name="language_russian">РУССКИЙ</string>
+    <string name="language_english">ENGLISH</string>
     <string name="brightness_master">OVERALL BRIGHTNESS</string>
     <string name="brightness_clock">CLOCK BRIGHTNESS</string>
     <string name="brightness_music">MUSIC BRIGHTNESS</string>
@@ -15,4 +19,17 @@ Interface</string>
     <string name="large_clock">LARGE CLOCK WHEN NOT CHARGING</string>
     <string name="notification_access">ALLOW NOTIFICATIONS</string>
     <string name="open_glyph_toys">OPEN GLYPH TOYS</string>
+    <string name="profiles_title">PROFILE</string>
+    <string name="profile_minimal">MINIMAL</string>
+    <string name="profile_nothing">NOTHING</string>
+    <string name="profile_bright">BRIGHT</string>
+    <string name="clock_font">CLOCK FONT</string>
+    <string name="font_classic">DEFAULT</string>
+    <string name="font_thin">DOT MATRIX</string>
+    <string name="visualizer_enabled">ENABLE VISUALIZER</string>
+    <string name="visualizer_style">VISUALIZER STYLE</string>
+    <string name="visualizer_wave">WAVE</string>
+    <string name="visualizer_pulse">PULSE</string>
+    <string name="visualizer_speed">SPEED</string>
+    <string name="author_credit">Created by @feneksx</string>
 </resources>
