@@ -17,10 +17,4 @@ Features:
 - APK: [`release/glyph-composite-toy-v1.6.apk`](release/glyph-composite-toy-v1.6.apk)
 - Preview: [`glyph-composite-toy-preview-512.png`](glyph-composite-toy-preview-512.png)
 
-## Nothing Playground
-
-1. Make the GitHub repository public.
-2. Create a GitHub Release with tag `v1.6` and attach the APK from `release`.
-3. Paste the public repository or release URL into the Glyph Toys submission form.
-
 Made for Nothing Phone (3), device `Glyph.DEVICE_23112`.
