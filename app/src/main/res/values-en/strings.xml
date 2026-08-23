@@ -10,9 +10,19 @@ Interface</string>
     <string name="language_system">SYSTEM DEFAULT</string>
     <string name="language_russian">РУССКИЙ</string>
     <string name="language_english">ENGLISH</string>
+    <string name="notification_apps_title">NOTIFICATION APPS</string>
+    <string name="notification_apps_choose">CHOOSE APPS</string>
+    <string name="notification_apps_all">All apps</string>
+    <string name="notification_apps_none">Notifications disabled</string>
+    <string name="notification_apps_selected">Selected apps: %d</string>
+    <string name="notification_apps_done">DONE</string>
+    <string name="notification_apps_search">Search apps</string>
+    <string name="notification_apps_enable_all">ENABLE ALL</string>
+    <string name="notification_apps_disable_all">DISABLE ALL</string>
     <string name="brightness_master">OVERALL BRIGHTNESS</string>
     <string name="brightness_clock">CLOCK BRIGHTNESS</string>
     <string name="brightness_music">MUSIC BRIGHTNESS</string>
+    <string name="brightness_volume">VOLUME BRIGHTNESS</string>
     <string name="brightness_battery">BATTERY BRIGHTNESS</string>
     <string name="brightness_notifications">NOTIFICATION BRIGHTNESS</string>
     <string name="brightness_flash">NOTIFICATION FLASH</string>
@@ -26,6 +36,7 @@ Interface</string>
     <string name="clock_font">CLOCK FONT</string>
     <string name="font_classic">DEFAULT</string>
     <string name="font_thin">DOT MATRIX</string>
+    <string name="font_grid">GRID PIXEL</string>
     <string name="visualizer_enabled">ENABLE VISUALIZER</string>
     <string name="visualizer_style">VISUALIZER STYLE</string>
     <string name="visualizer_wave">WAVE</string>

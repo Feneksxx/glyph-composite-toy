@@ -6,6 +6,8 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -23,16 +25,29 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.app.AlertDialog;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "glyph_composite";
     private static final String CLOCK_BRIGHTNESS = "clock_brightness";
     private static final String MUSIC_BRIGHTNESS = "music_brightness";
+    private static final String VOLUME_BRIGHTNESS = "volume_brightness";
     private static final String BATTERY_BRIGHTNESS = "battery_brightness";
     private static final String NOTIFICATION_BRIGHTNESS = "notification_brightness";
     private static final String NOTIFICATION_FLASH_BRIGHTNESS = "notification_flash_brightness";
@@ -44,9 +59,12 @@ public class MainActivity extends Activity {
     private static final String VISUALIZER_SPEED = "visualizer_speed";
     private static final String LANGUAGE = "language";
     private static final String LANGUAGE_SYSTEM = "system";
+    private static final String NOTIFICATION_PACKAGES = "notification_packages";
+    private static final String NOTIFICATION_NONE = "__none__";
     private static final String SETTINGS_VERSION = "settings_version";
     private static final int DEFAULT_BRIGHTNESS = 120;
     private static final int DEFAULT_MASTER_BRIGHTNESS = 180;
+    private AlertDialog notificationDialog;
 
     @Override protected void attachBaseContext(Context base) {
         String language = base.getSharedPreferences(PREFS, MODE_PRIVATE)
@@ -83,6 +101,7 @@ public class MainActivity extends Activity {
         root.addView(description, descriptionParams);
 
         addLanguageControl(root, preferences);
+        addNotificationFilterControl(root, preferences);
 
         Space space = new Space(this);
         root.addView(space, new LinearLayout.LayoutParams(1, dp(22)));
@@ -90,6 +109,7 @@ public class MainActivity extends Activity {
         addBrightnessControl(root, preferences, getString(R.string.brightness_master), MASTER_BRIGHTNESS, DEFAULT_MASTER_BRIGHTNESS);
         addBrightnessControl(root, preferences, getString(R.string.brightness_clock), CLOCK_BRIGHTNESS, DEFAULT_BRIGHTNESS);
         addBrightnessControl(root, preferences, getString(R.string.brightness_music), MUSIC_BRIGHTNESS, DEFAULT_BRIGHTNESS);
+        addBrightnessControl(root, preferences, getString(R.string.brightness_volume), VOLUME_BRIGHTNESS, DEFAULT_BRIGHTNESS);
         addBrightnessControl(root, preferences, getString(R.string.brightness_battery), BATTERY_BRIGHTNESS, DEFAULT_BRIGHTNESS);
         addBrightnessControl(root, preferences, getString(R.string.brightness_notifications), NOTIFICATION_BRIGHTNESS, DEFAULT_BRIGHTNESS);
         addBrightnessControl(root, preferences, getString(R.string.brightness_flash), NOTIFICATION_FLASH_BRIGHTNESS, DEFAULT_BRIGHTNESS);
@@ -185,13 +205,234 @@ public class MainActivity extends Activity {
         root.addView(box, params);
     }
 
+    private void addNotificationFilterControl(LinearLayout root, SharedPreferences preferences) {
+        LinearLayout box = card();
+        TextView title = text(getString(R.string.notification_apps_title), 12,
+                Color.rgb(175, 175, 175));
+        title.setLetterSpacing(0.10f);
+        box.addView(title);
+
+        TextView summary = text(notificationFilterSummary(preferences), 13,
+                Color.rgb(135, 135, 135));
+        summary.setPadding(0, dp(8), 0, dp(6));
+        box.addView(summary);
+
+        Button choose = actionButton(getString(R.string.notification_apps_choose), false);
+        choose.setOnClickListener(v -> showNotificationPackageDialog(preferences, summary));
+        box.addView(choose, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(12);
+        root.addView(box, params);
+    }
+
+    private String notificationFilterSummary(SharedPreferences preferences) {
+        Set<String> selected = preferences.getStringSet(NOTIFICATION_PACKAGES,
+                Collections.emptySet());
+        if (selected.contains(NOTIFICATION_NONE)) return getString(R.string.notification_apps_none);
+        if (selected.isEmpty()) return getString(R.string.notification_apps_all);
+        return getString(R.string.notification_apps_selected, selected.size());
+    }
+
+    private void showNotificationPackageDialog(SharedPreferences preferences, TextView summary) {
+        if (notificationDialog != null && notificationDialog.isShowing()) return;
+        final List<ApplicationInfo> applications = new ArrayList<>();
+        Set<String> saved = preferences.getStringSet(NOTIFICATION_PACKAGES,
+                Collections.emptySet());
+        boolean disabled = saved.contains(NOTIFICATION_NONE);
+        boolean allSelected = saved.isEmpty();
+        HashSet<String> working = new HashSet<>();
+        if (!disabled && !allSelected) working.addAll(saved);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(12), dp(20), dp(4));
+        content.setBackgroundColor(Color.rgb(14, 14, 14));
+
+        TextView heading = text(getString(R.string.notification_apps_title), 13,
+                Color.WHITE);
+        heading.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        heading.setLetterSpacing(0.08f);
+        content.addView(heading, new LinearLayout.LayoutParams(-1, -2));
+
+        EditText search = new EditText(this);
+        search.setSingleLine(true);
+        search.setHint(getString(R.string.notification_apps_search));
+        search.setHintTextColor(Color.rgb(120, 120, 120));
+        search.setTextColor(Color.WHITE);
+        search.setTextSize(14);
+        search.setPadding(dp(14), 0, dp(14), 0);
+        GradientDrawable searchBackground = new GradientDrawable();
+        searchBackground.setColor(Color.rgb(28, 28, 28));
+        searchBackground.setCornerRadius(dp(22));
+        search.setBackground(searchBackground);
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(46));
+        searchParams.topMargin = dp(12);
+        content.addView(search, searchParams);
+
+        LinearLayout bulkActions = new LinearLayout(this);
+        bulkActions.setGravity(Gravity.CENTER_VERTICAL);
+        Button enableAll = actionButton(getString(R.string.notification_apps_enable_all), false);
+        Button disableAll = actionButton(getString(R.string.notification_apps_disable_all), false);
+        enableAll.setEnabled(false);
+        disableAll.setEnabled(false);
+        bulkActions.addView(enableAll, new LinearLayout.LayoutParams(0, dp(42), 1));
+        LinearLayout.LayoutParams disableParams = new LinearLayout.LayoutParams(0, dp(42), 1);
+        disableParams.leftMargin = dp(8);
+        bulkActions.addView(disableAll, disableParams);
+        LinearLayout.LayoutParams bulkParams = new LinearLayout.LayoutParams(-1, dp(42));
+        bulkParams.topMargin = dp(10);
+        content.addView(bulkActions, bulkParams);
+
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        ScrollView listScroll = new ScrollView(this);
+        listScroll.setFillViewport(true);
+        listScroll.addView(list);
+        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(-1, dp(420));
+        listParams.topMargin = dp(10);
+        content.addView(listScroll, listParams);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(content)
+                .setPositiveButton(R.string.notification_apps_done, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        notificationDialog = dialog;
+
+        Runnable rebuild = () -> {
+            String query = search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            list.removeAllViews();
+            for (ApplicationInfo info : applications) {
+                String label = String.valueOf(getPackageManager().getApplicationLabel(info));
+                if (!query.isEmpty() && !label.toLowerCase(Locale.ROOT).contains(query)
+                        && !info.packageName.toLowerCase(Locale.ROOT).contains(query)) continue;
+                list.addView(notificationAppRow(info, label, working));
+            }
+        };
+        enableAll.setOnClickListener(v -> {
+            working.clear();
+            for (ApplicationInfo info : applications) working.add(info.packageName);
+            rebuild.run();
+        });
+        disableAll.setOnClickListener(v -> {
+            working.clear();
+            rebuild.run();
+        });
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { rebuild.run(); }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        dialog.setOnShowListener(ignored -> {
+            if (dialog.getWindow() != null) {
+                GradientDrawable dialogBackground = new GradientDrawable();
+                dialogBackground.setColor(Color.rgb(14, 14, 14));
+                dialogBackground.setCornerRadius(dp(22));
+                dialog.getWindow().setBackgroundDrawable(dialogBackground);
+            }
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.WHITE);
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.rgb(170, 170, 170));
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    if (working.size() >= applications.size()) {
+                        preferences.edit().remove(NOTIFICATION_PACKAGES).apply();
+                        GlyphNotificationListener.setAllowedPackages(Collections.emptySet());
+                    } else if (working.isEmpty()) {
+                        HashSet<String> none = new HashSet<>();
+                        none.add(NOTIFICATION_NONE);
+                        preferences.edit().putStringSet(NOTIFICATION_PACKAGES, none).apply();
+                        GlyphNotificationListener.setAllowedPackages(none);
+                    } else {
+                        preferences.edit().putStringSet(NOTIFICATION_PACKAGES,
+                                new HashSet<>(working)).apply();
+                        GlyphNotificationListener.setAllowedPackages(working);
+                    }
+                    summary.setText(notificationFilterSummary(preferences));
+                    dialog.dismiss();
+            });
+        });
+        dialog.setOnDismissListener(ignored -> notificationDialog = null);
+        dialog.show();
+        // Package enumeration and icon metadata are deliberately off the UI
+        // thread. The dialog becomes visible immediately instead of flashing
+        // the previous screen or opening twice after a long pause.
+        new Thread(() -> {
+            ArrayList<ApplicationInfo> loaded = new ArrayList<>();
+            PackageManager packageManager = getPackageManager();
+            for (ApplicationInfo info : packageManager.getInstalledApplications(
+                    PackageManager.GET_META_DATA)) {
+                if (getPackageName().equals(info.packageName)) continue;
+                if (isSystemApplication(info)
+                        && packageManager.getLaunchIntentForPackage(info.packageName) == null) {
+                    continue;
+                }
+                loaded.add(info);
+            }
+            Collections.sort(loaded, Comparator
+                    .comparing((ApplicationInfo info) -> isSystemApplication(info))
+                    .thenComparing(info -> packageManager.getLaunchIntentForPackage(info.packageName) == null)
+                    .thenComparing(info -> String.valueOf(packageManager
+                            .getApplicationLabel(info)).toLowerCase(Locale.ROOT)));
+            runOnUiThread(() -> {
+                if (notificationDialog == null || !notificationDialog.isShowing()) return;
+                applications.addAll(loaded);
+                if (!disabled && allSelected) {
+                    for (ApplicationInfo info : applications) working.add(info.packageName);
+                }
+                enableAll.setEnabled(true);
+                disableAll.setEnabled(true);
+                rebuild.run();
+            });
+        }, "glyph-app-list").start();
+    }
+
+    private View notificationAppRow(ApplicationInfo info, String label, Set<String> working) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(4), dp(7), 0, dp(7));
+
+        ImageView icon = new ImageView(this);
+        icon.setImageDrawable(info.loadIcon(getPackageManager()));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        LinearLayout names = new LinearLayout(this);
+        names.setOrientation(LinearLayout.VERTICAL);
+        names.setPadding(dp(12), 0, dp(8), 0);
+        TextView title = text(label, 14, Color.WHITE);
+        title.setSingleLine(true);
+        TextView packageName = text(info.packageName, 10, Color.rgb(125, 125, 125));
+        packageName.setSingleLine(true);
+        names.addView(title);
+        names.addView(packageName, new LinearLayout.LayoutParams(-1, -2));
+        row.addView(names, new LinearLayout.LayoutParams(0, -2, 1));
+
+        CheckBox check = new CheckBox(this);
+        check.setButtonTintList(new android.content.res.ColorStateList(
+                new int[][] {new int[] {android.R.attr.state_checked}, new int[] {}},
+                new int[] {Color.WHITE, Color.rgb(100, 100, 100)}));
+        check.setChecked(working.contains(info.packageName));
+        check.setOnCheckedChangeListener((button, checked) -> {
+            if (checked) working.add(info.packageName);
+            else working.remove(info.packageName);
+        });
+        row.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        row.setOnClickListener(v -> check.setChecked(!check.isChecked()));
+        return row;
+    }
+
+    private boolean isSystemApplication(ApplicationInfo info) {
+        int mask = ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
+        return (info.flags & mask) != 0;
+    }
+
     private void addClockFontControl(LinearLayout root, SharedPreferences preferences) {
         LinearLayout box = card();
         TextView title = text(getString(R.string.clock_font), 12, Color.rgb(175, 175, 175));
         title.setLetterSpacing(0.10f);
         box.addView(title);
         Spinner spinner = new Spinner(this);
-        String[] fonts = {getString(R.string.font_classic), getString(R.string.font_thin)};
+        String[] fonts = {getString(R.string.font_classic), getString(R.string.font_thin),
+                getString(R.string.font_grid)};
         spinner.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, fonts));
         spinner.setSelection(Math.min(1, preferences.getInt(CLOCK_FONT, 0)));
         spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {

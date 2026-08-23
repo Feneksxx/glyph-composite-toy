@@ -1,6 +1,7 @@
 package com.feneksxx.glyphcomposite;
 
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -27,6 +28,7 @@ public class CompositeGlyphToyService extends Service {
     private static final String PREFS = "glyph_composite";
     private static final String CLOCK_BRIGHTNESS = "clock_brightness";
     private static final String MUSIC_BRIGHTNESS = "music_brightness";
+    private static final String VOLUME_BRIGHTNESS = "volume_brightness";
     private static final String BATTERY_BRIGHTNESS = "battery_brightness";
     private static final String NOTIFICATION_BRIGHTNESS = "notification_brightness";
     private static final String NOTIFICATION_FLASH_BRIGHTNESS = "notification_flash_brightness";
@@ -61,6 +63,22 @@ public class CompositeGlyphToyService extends Service {
     private final float[] visualizerLevels = new float[7];
     private int lastMusicVolume = -1;
     private long volumeIndicatorUntil = 0L;
+    private float dotVolumeFrom = 0f;
+    private float dotVolumeTo = 0f;
+    private float dotVolumeLevel = 0f;
+    private long dotVolumeAnimationStarted = 0L;
+    private static final long DOT_VOLUME_ANIMATION_MS = 140L;
+
+    private final BroadcastReceiver volumeReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (audioManager == null) return;
+            int volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            if (lastMusicVolume == -1 || volume == lastMusicVolume) return;
+            handleVolumeChanged(volume);
+            handler.removeCallbacks(loop);
+            handler.post(loop);
+        }
+    };
 
     private final Runnable loop = new Runnable() {
         @Override public void run() {
@@ -72,6 +90,17 @@ public class CompositeGlyphToyService extends Service {
     @Override public IBinder onBind(Intent intent) {
         initGlyph();
         return null;
+    }
+
+    @Override public void onCreate() {
+        super.onCreate();
+        registerReceiver(volumeReceiver,
+                new android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION"));
+    }
+
+    @Override public void onDestroy() {
+        unregisterReceiver(volumeReceiver);
+        super.onDestroy();
     }
 
     @Override public boolean onUnbind(Intent intent) {
@@ -117,7 +146,13 @@ public class CompositeGlyphToyService extends Service {
         else drawBatteryLevelLine(canvas, level);
 
         updateVolumeIndicator();
-        drawVolumeIndicator(canvas);
+        // The clock reserves columns 2..22, so the two outermost columns can
+        // safely extend the volume bar only for the dedicated Grid font.
+        boolean gridClock = preferences != null
+                && preferences.getInt(CLOCK_FONT, 1) == 2;
+        boolean dotClock = preferences != null
+                && preferences.getInt(CLOCK_FONT, 1) == 1;
+        drawVolumeIndicator(canvas, gridClock, dotClock);
 
         float flashAlpha = GlyphNotificationListener.notificationFlashAlpha();
         if (flashAlpha > 0f) {
@@ -152,6 +187,10 @@ public class CompositeGlyphToyService extends Service {
         if (visualizerEnabled && visualizerEnvelope >= 0.02f) return 80L;
         if (GlyphNotificationListener.shouldShowNotificationFlash()) return 80L;
         if (System.currentTimeMillis() < volumeIndicatorUntil) return 80L;
+
+        // Poll the media volume frequently enough for the edge indicator to
+        // react without waiting for the slow idle-clock frame.
+        if (audioManager != null) return 80L;
 
         Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         int status = battery == null ? 0 : battery.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
@@ -291,11 +330,113 @@ public class CompositeGlyphToyService extends Service {
         String time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
                 .format(new java.util.Date());
         int intensity = brightness(CLOCK_BRIGHTNESS);
+        int font = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
         boolean large = !charging && preferences != null
                 && preferences.getBoolean(LARGE_CLOCK, true);
+        if (font == 2) {
+            if (large) drawGridClock(canvas, time, intensity);
+            else drawGridChargingClock(canvas, time, intensity);
+            return;
+        }
+        if (font == 1) {
+            if (large) drawDotClock(canvas, time, intensity);
+            else drawDotChargingClock(canvas, time, intensity);
+            return;
+        }
         int startX = 4;
         if (large) drawLargePixelText(canvas, time, startX, 9, intensity);
         else drawPixelText(canvas, time, startX, 7, intensity);
+    }
+
+    private void drawGridClock(Canvas canvas, String value, int intensity) {
+        int x = 2;
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character == ':') {
+                drawPixel(canvas, x, 10, intensity);
+                drawPixel(canvas, x, 14, intensity);
+                x += 2;
+                continue;
+            }
+            int[] rows = GRID_LARGE_DIGITS[character - '0'];
+            for (int row = 0; row < 7; row++) {
+                for (int column = 0; column < 4; column++) {
+                    if ((rows[row] & (1 << (3 - column))) != 0) {
+                        drawPixel(canvas, x + column, 9 + row, intensity);
+                    }
+                }
+            }
+            x += 5;
+        }
+    }
+
+    private void drawDotClock(Canvas canvas, String value, int intensity) {
+        int x = 2;
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character == ':') {
+                drawPixel(canvas, x, 11, intensity);
+                drawPixel(canvas, x, 13, intensity);
+                x += 2;
+                continue;
+            }
+            int[] rows = DOT_LARGE_DIGITS[character - '0'];
+            for (int row = 0; row < 7; row++) {
+                for (int column = 0; column < 4; column++) {
+                    if ((rows[row] & (1 << (3 - column))) != 0) {
+                        drawPixel(canvas, x + column, 9 + row, intensity);
+                    }
+                }
+            }
+            x += 5;
+        }
+    }
+
+    private void drawDotChargingClock(Canvas canvas, String value, int intensity) {
+        // Charging uses the same compact clock zone as the default style:
+        // five rows starting at row 7, leaving the existing battery geometry
+        // untouched below it.
+        int x = 2;
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character == ':') {
+                drawPixel(canvas, x, 8, intensity);
+                drawPixel(canvas, x, 10, intensity);
+                x += 2;
+                continue;
+            }
+            int[] rows = DOT_CHARGING_DIGITS[character - '0'];
+            for (int row = 0; row < 5; row++) {
+                for (int column = 0; column < 4; column++) {
+                    if ((rows[row] & (1 << (3 - column))) != 0) {
+                        drawPixel(canvas, x + column, 7 + row, intensity);
+                    }
+                }
+            }
+            x += 5;
+        }
+    }
+
+    private void drawGridChargingClock(Canvas canvas, String value, int intensity) {
+        int x = 2;
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character == ':') {
+                drawPixel(canvas, x, 8, intensity);
+                drawPixel(canvas, x, 10, intensity);
+                x += 2;
+                continue;
+            }
+            int[] rows = GRID_CHARGING_DIGITS[character - '0'];
+            for (int row = 0; row < 5; row++) {
+                for (int column = 0; column < 4; column++) {
+                    if ((rows[row] & (1 << (3 - column))) != 0) {
+                        drawPixel(canvas, x + column, 7 + row, intensity);
+                    }
+                }
+            }
+            x += 5;
+        }
     }
 
     private void drawBattery(Canvas canvas, int level, boolean charging) {
@@ -357,22 +498,87 @@ public class CompositeGlyphToyService extends Service {
         int volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         if (lastMusicVolume == -1) {
             lastMusicVolume = volume;
+            float initial = volume / (float) Math.max(1,
+                    audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+            dotVolumeFrom = initial;
+            dotVolumeTo = initial;
+            dotVolumeLevel = initial;
         } else if (volume != lastMusicVolume) {
-            lastMusicVolume = volume;
-            volumeIndicatorUntil = System.currentTimeMillis() + 3500L;
+            handleVolumeChanged(volume);
         }
     }
 
-    private void drawVolumeIndicator(Canvas canvas) {
+    private void handleVolumeChanged(int volume) {
+        long now = System.currentTimeMillis();
+        if (dotVolumeAnimationStarted != 0L) {
+            float progress = Math.min(1f, (now - dotVolumeAnimationStarted)
+                    / (float) DOT_VOLUME_ANIMATION_MS);
+            float eased = progress * progress * (3f - 2f * progress);
+            dotVolumeLevel = dotVolumeFrom + (dotVolumeTo - dotVolumeFrom) * eased;
+        }
+        lastMusicVolume = volume;
+        dotVolumeFrom = dotVolumeLevel;
+        dotVolumeTo = volume / (float) Math.max(1,
+                audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        dotVolumeAnimationStarted = now;
+        volumeIndicatorUntil = now + 3500L;
+    }
+
+    private void drawVolumeIndicator(Canvas canvas, boolean gridClock, boolean dotClock) {
         if (System.currentTimeMillis() >= volumeIndicatorUntil || audioManager == null) return;
 
         int max = Math.max(1, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
         int current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        int bright = brightness(MUSIC_BRIGHTNESS);
+        int bright = brightness(VOLUME_BRIGHTNESS);
         int dim = Math.max(8, Math.round(bright * 0.12f));
         float level = current / (float) max * 11f;
         // One straight eleven-pixel line just inside the physical edge.
         int[] yLevels = {12, 11, 13, 10, 14, 9, 15, 8, 16, 7, 17};
+
+        if (dotClock) {
+            long elapsed = System.currentTimeMillis() - dotVolumeAnimationStarted;
+            float animatedLevel = dotVolumeTo;
+            float progress = 1f;
+            if (dotVolumeAnimationStarted != 0L && elapsed < DOT_VOLUME_ANIMATION_MS) {
+                progress = Math.max(0f, elapsed / (float) DOT_VOLUME_ANIMATION_MS);
+                float eased = progress * progress * (3f - 2f * progress);
+                animatedLevel = dotVolumeFrom + (dotVolumeTo - dotVolumeFrom) * eased;
+                dotVolumeLevel = animatedLevel;
+            } else {
+                dotVolumeLevel = dotVolumeTo;
+            }
+            int filled = Math.round(Math.max(0f, Math.min(1f, animatedLevel)) * 7f);
+            int fromFilled = Math.round(dotVolumeFrom * 7f);
+            int targetFilled = Math.round(dotVolumeTo * 7f);
+            for (int i = 0; i < 7; i++) {
+                int y = 15 - i;
+                int intensity = i < filled ? bright : 0;
+                if (dotVolumeAnimationStarted != 0L
+                        && targetFilled > fromFilled && i == fromFilled) {
+                    intensity = Math.max(intensity, Math.round(bright * progress));
+                } else if (dotVolumeAnimationStarted != 0L
+                        && targetFilled < fromFilled && i == targetFilled) {
+                    intensity = Math.max(intensity, Math.round(bright * (1f - progress)));
+                }
+                drawPixel(canvas, 0, y, intensity);
+                drawPixel(canvas, 24, y, intensity);
+            }
+            return;
+        }
+
+        if (gridClock) {
+            // Grid mode reserves the inner edge columns completely. The
+            // outer columns are the only volume indicator in this mode.
+            // Unlike the stepped 11-pixel bar below, this uses the complete
+            // 0..100% range and cannot saturate early.
+            float fraction = current / (float) max;
+            int edgeIntensity = Math.round(bright * fraction);
+            for (int y : yLevels) {
+                drawPixel(canvas, 0, y, edgeIntensity);
+                drawPixel(canvas, 24, y, edgeIntensity);
+            }
+            return;
+        }
 
         for (int i = 0; i < yLevels.length; i++) {
             float fill = Math.max(0f, Math.min(1f, level - i));
@@ -469,9 +675,45 @@ public class CompositeGlyphToyService extends Service {
 
     private int[] fontRows(int digit) {
         int style = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
+        if (style == 2) return GRID_DIGITS[digit];
         if (style == 1) return DOT_DIGITS[digit];
         return DIGITS[digit];
     }
+
+    // Compact 3x5 grid font. The one is split into two upper and two lower
+    // pixels with an empty centre for a cleaner Glyph appearance.
+    private static final int[][] GRID_DIGITS = {
+        {7,5,5,5,7}, {2,2,0,2,2}, {7,1,3,4,7}, {7,1,3,1,7}, {5,5,7,1,3},
+        {7,4,6,1,7}, {7,4,6,5,7}, {7,1,1,1,3}, {7,5,7,5,7}, {7,5,7,1,7}
+    };
+
+    private static final int[][] GRID_LARGE_DIGITS = {
+        {15,9,9,9,9,9,15}, {2,6,2,2,2,2,7},
+        {15,1,1,15,8,8,15}, {15,1,1,7,1,1,15},
+        {9,9,9,15,1,1,1}, {15,8,8,15,1,1,15},
+        {15,8,8,15,9,9,15}, {15,1,1,1,1,1,1},
+        {15,9,9,15,9,9,15}, {15,9,9,15,1,1,15}
+    };
+
+    private static final int[][] DOT_LARGE_DIGITS = {
+        {6,9,9,0,9,9,6}, {0,1,1,0,1,1,0},
+        {6,1,1,6,8,8,6}, {6,1,1,6,1,1,6},
+        {0,9,9,6,1,1,0}, {6,8,8,6,1,1,6},
+        {6,8,8,6,9,9,6}, {6,1,1,0,1,1,1},
+        {6,9,9,6,9,9,6}, {6,9,9,6,1,1,6}
+    };
+
+    private static final int[][] DOT_CHARGING_DIGITS = {
+        {6,9,0,9,6}, {1,1,0,1,1}, {6,1,6,8,6}, {6,1,6,1,6},
+        {9,9,6,1,1}, {6,8,6,1,6}, {6,8,6,9,6}, {6,1,0,1,1},
+        {6,9,6,9,6}, {6,9,6,1,6}
+    };
+
+    private static final int[][] GRID_CHARGING_DIGITS = {
+        {15,9,9,9,15}, {2,6,2,2,7}, {15,1,15,8,15}, {15,1,7,1,15},
+        {9,9,15,1,1}, {15,8,15,1,15}, {15,8,15,9,15}, {15,1,1,1,1},
+        {15,9,15,9,15}, {15,9,15,1,15}
+    };
 
     private static final int[][] MINIMAL_DIGITS = {
         {7,5,5,5,7}, {2,2,2,2,2}, {7,1,7,4,7}, {7,1,7,1,7}, {5,5,7,1,1},

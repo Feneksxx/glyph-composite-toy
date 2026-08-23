@@ -10,9 +10,19 @@ Interface</string>
     <string name="language_system">ПО СИСТЕМЕ</string>
     <string name="language_russian">РУССКИЙ</string>
     <string name="language_english">ENGLISH</string>
+    <string name="notification_apps_title">ПРИЛОЖЕНИЯ ДЛЯ УВЕДОМЛЕНИЙ</string>
+    <string name="notification_apps_choose">ВЫБРАТЬ ПРИЛОЖЕНИЯ</string>
+    <string name="notification_apps_all">Все приложения</string>
+    <string name="notification_apps_none">Уведомления выключены</string>
+    <string name="notification_apps_selected">Выбрано приложений: %d</string>
+    <string name="notification_apps_done">ГОТОВО</string>
+    <string name="notification_apps_search">Поиск приложения</string>
+    <string name="notification_apps_enable_all">ВКЛЮЧИТЬ ВСЕ</string>
+    <string name="notification_apps_disable_all">ВЫКЛЮЧИТЬ ВСЕ</string>
     <string name="brightness_master">ОБЩАЯ ЯРКОСТЬ</string>
     <string name="brightness_clock">ЯРКОСТЬ ЧАСОВ</string>
     <string name="brightness_music">ЯРКОСТЬ МУЗЫКИ</string>
+    <string name="brightness_volume">ЯРКОСТЬ ГРОМКОСТИ</string>
     <string name="brightness_battery">ЯРКОСТЬ БАТАРЕИ</string>
     <string name="brightness_notifications">ЯРКОСТЬ УВЕДОМЛЕНИЙ</string>
     <string name="brightness_flash">ЯРКОСТЬ МИГАНИЯ</string>
@@ -26,6 +36,7 @@ Interface</string>
     <string name="clock_font">ШРИФТ ЧАСОВ</string>
     <string name="font_classic">ПО УМОЛЧАНИЮ</string>
     <string name="font_thin">ТОЧЕЧНЫЙ</string>
+    <string name="font_grid">СЕТКА</string>
     <string name="visualizer_enabled">ВКЛЮЧИТЬ ВИЗУАЛАЙЗЕР</string>
     <string name="visualizer_style">СТИЛЬ ВИЗУАЛАЙЗЕРА</string>
     <string name="visualizer_wave">ВОЛНА</string>

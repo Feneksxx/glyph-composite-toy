@@ -24,14 +24,14 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 1. Create a **public** GitHub repository named `glyph-composite-toy`.
 2. Upload the project contents. Do not upload `local.properties`, `.gradle/`, `.gradle-user-home/`, `.idea/`, `build/`, `local-debug.keystore`, or the SDK AAR.
 3. In Android Studio, build `app-debug.apk` or a signed release APK.
-4. Open the repository's **Releases** page, create a release tag such as `v1.5`, and attach the APK.
+4. Open the repository's **Releases** page, create a release tag `v1.6`, and attach `release/glyph-composite-toy-v1.6.apk`.
 5. Paste the public repository or release URL into the Glyph Toys submission form.
 
 The repository and release must be accessible without signing in. The SDK AAR is intentionally excluded because it is supplied by Nothing's developer kit and may have redistribution restrictions.
 
 ## Included APK
 
-The ready-to-test APK is included at [`release/glyph-composite-toy-v1.5.apk`](release/glyph-composite-toy-v1.5.apk). It is intended for personal installation and Glyph Toy testing. A separately signed release APK should be used for Play Store publication.
+The ready-to-test APK is included at [`release/glyph-composite-toy-v1.6.apk`](release/glyph-composite-toy-v1.6.apk). It is intended for personal installation and Glyph Toy testing. A separately signed release APK should be used for Play Store publication.
 
 ## Local checklist
 

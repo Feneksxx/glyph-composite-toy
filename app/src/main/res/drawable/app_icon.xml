@@ -25,5 +25,5 @@
     <!-- Bottom music visualizer, separated from the battery line. -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M36,82h4v6h-4zM44,78h4v10h-4zM52,74h4v14h-4zM60,78h4v10h-4zM68,82h4v6h-4z" />
+        android:pathData="M36,82h4v6h-4zM44,78h4v10h-4zM52,74h4v14h-4zM52,88h4v4h-4zM60,78h4v10h-4zM68,82h4v6h-4z" />
 </vector>
