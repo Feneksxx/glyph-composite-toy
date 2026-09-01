@@ -27,6 +27,7 @@ Interface</string>
     <string name="brightness_notifications">ЯРКОСТЬ УВЕДОМЛЕНИЙ</string>
     <string name="brightness_flash">ЯРКОСТЬ МИГАНИЯ</string>
     <string name="large_clock">БОЛЬШИЕ ЧАСЫ БЕЗ ЗАРЯДКИ</string>
+    <string name="compact_charging_battery">ОБЫЧНАЯ ПОЛОСКА ПРИ ЗАРЯДКЕ</string>
     <string name="notification_access">РАЗРЕШИТЬ УВЕДОМЛЕНИЯ</string>
     <string name="open_glyph_toys">ОТКРЫТЬ GLYPH TOYS</string>
     <string name="profiles_title">ПРОФИЛЬ</string>
@@ -42,5 +43,11 @@ Interface</string>
     <string name="visualizer_wave">ВОЛНА</string>
     <string name="visualizer_pulse">ПУЛЬС</string>
     <string name="visualizer_speed">СКОРОСТЬ</string>
+    <string name="notification_style">СТИЛЬ АНИМАЦИИ УВЕДОМЛЕНИЯ</string>
+    <string name="notification_style_breathe">ДЫШАЩИЙ КРУГ</string>
+    <string name="notification_style_radar">РАДИАЛЬНЫЙ ИМПУЛЬС</string>
+    <string name="notification_style_orbit">ОРБИТА</string>
+    <string name="notification_style_spiral">СПИРАЛЬ</string>
+    <string name="notification_style_diagonal">ДИАГОНАЛЬНАЯ ВОЛНА</string>
     <string name="author_credit">Created by @feneksx</string>
 </resources>

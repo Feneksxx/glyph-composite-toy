@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 
 android { namespace 'com.feneksxx.glyphcomposite'; compileSdk 35
-    defaultConfig { applicationId 'com.feneksxx.glyphcomposite'; minSdk 34; targetSdk 35; versionCode 5; versionName '1.6' }
+    defaultConfig { applicationId 'com.feneksxx.glyphcomposite'; minSdk 34; targetSdk 35; versionCode 6; versionName '1.7' }
 }
 
 dependencies {

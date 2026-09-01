@@ -19,6 +19,7 @@ public class GlyphNotificationListener extends NotificationListenerService {
     private static volatile Set<String> allowedPackages = Collections.emptySet();
     private static volatile boolean notificationsDisabled;
     private static final long FLASH_WINDOW_MS = 10000L;
+    private static final long ENTER_FADE_MS = 280L;
     private static final long TRANSITION_MS = 900L;
     private static final long EXIT_FADE_MS = 700L;
 
@@ -93,6 +94,7 @@ public class GlyphNotificationListener extends NotificationListenerService {
         if (latestNotificationAt == 0L) return 0f;
         long elapsed = now - latestNotificationAt;
         if (elapsed < 0L || elapsed >= FLASH_WINDOW_MS + TRANSITION_MS) return 0f;
+        if (elapsed < ENTER_FADE_MS) return elapsed / (float) ENTER_FADE_MS;
         if (elapsed < FLASH_WINDOW_MS) return 1f;
         return 1f - (elapsed - FLASH_WINDOW_MS) / (float) TRANSITION_MS;
     }

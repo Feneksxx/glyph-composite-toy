@@ -8,10 +8,10 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -31,9 +31,6 @@ import android.widget.ImageView;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.app.AlertDialog;
-import android.text.SpannableString;
-import android.text.method.LinkMovementMethod;
-import android.text.style.ClickableSpan;
 
 import java.util.Locale;
 import java.util.ArrayList;
@@ -42,6 +39,8 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "glyph_composite";
@@ -57,6 +56,8 @@ public class MainActivity extends Activity {
     private static final String VISUALIZER_ENABLED = "visualizer_enabled";
     private static final String VISUALIZER_STYLE = "visualizer_style";
     private static final String VISUALIZER_SPEED = "visualizer_speed";
+    private static final String NOTIFICATION_STYLE = "notification_style";
+    private static final String COMPACT_CHARGING_BATTERY = "compact_charging_battery";
     private static final String LANGUAGE = "language";
     private static final String LANGUAGE_SYSTEM = "system";
     private static final String NOTIFICATION_PACKAGES = "notification_packages";
@@ -65,6 +66,9 @@ public class MainActivity extends Activity {
     private static final int DEFAULT_BRIGHTNESS = 120;
     private static final int DEFAULT_MASTER_BRIGHTNESS = 180;
     private AlertDialog notificationDialog;
+    private List<ApplicationInfo> notificationApplicationsCache;
+    private final Map<String, String> notificationLabelsCache = new HashMap<>();
+    private final Map<String, Drawable> notificationIconsCache = new HashMap<>();
 
     @Override protected void attachBaseContext(Context base) {
         String language = base.getSharedPreferences(PREFS, MODE_PRIVATE)
@@ -116,6 +120,7 @@ public class MainActivity extends Activity {
 
         addClockFontControl(root, preferences);
         addVisualizerControls(root, preferences);
+        addNotificationAnimationControl(root, preferences);
 
         LinearLayout clockMode = card();
         Switch largeClock = new Switch(this);
@@ -126,6 +131,14 @@ public class MainActivity extends Activity {
         largeClock.setOnCheckedChangeListener((button, checked) ->
                 preferences.edit().putBoolean(LARGE_CLOCK, checked).apply());
         clockMode.addView(largeClock, new LinearLayout.LayoutParams(-1, -2));
+        Switch compactBattery = new Switch(this);
+        compactBattery.setText(getString(R.string.compact_charging_battery));
+        compactBattery.setTextColor(Color.WHITE);
+        compactBattery.setTextSize(12);
+        compactBattery.setChecked(preferences.getBoolean(COMPACT_CHARGING_BATTERY, true));
+        compactBattery.setOnCheckedChangeListener((button, checked) ->
+                preferences.edit().putBoolean(COMPACT_CHARGING_BATTERY, checked).apply());
+        clockMode.addView(compactBattery, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams clockModeParams = new LinearLayout.LayoutParams(-1, -2);
         clockModeParams.topMargin = dp(8);
         root.addView(clockMode, clockModeParams);
@@ -148,19 +161,6 @@ public class MainActivity extends Activity {
 
         TextView credit = text(getString(R.string.author_credit), 12, Color.rgb(135, 135, 135));
         credit.setGravity(Gravity.CENTER);
-        SpannableString creditText = new SpannableString(getString(R.string.author_credit));
-        String handle = "@feneksx";
-        int handleStart = creditText.toString().indexOf(handle);
-        if (handleStart >= 0) {
-            creditText.setSpan(new ClickableSpan() {
-                @Override public void onClick(View widget) {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FeneksX")));
-                }
-            }, handleStart, handleStart + handle.length(), SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        credit.setText(creditText);
-        credit.setMovementMethod(LinkMovementMethod.getInstance());
-        credit.setHighlightColor(Color.TRANSPARENT);
         LinearLayout.LayoutParams creditParams = new LinearLayout.LayoutParams(-1, -2);
         creditParams.topMargin = dp(18);
         root.addView(credit, creditParams);
@@ -304,7 +304,9 @@ public class MainActivity extends Activity {
             String query = search.getText().toString().trim().toLowerCase(Locale.ROOT);
             list.removeAllViews();
             for (ApplicationInfo info : applications) {
-                String label = String.valueOf(getPackageManager().getApplicationLabel(info));
+                String label = notificationLabelsCache.containsKey(info.packageName)
+                        ? notificationLabelsCache.get(info.packageName)
+                        : String.valueOf(getPackageManager().getApplicationLabel(info));
                 if (!query.isEmpty() && !label.toLowerCase(Locale.ROOT).contains(query)
                         && !info.packageName.toLowerCase(Locale.ROOT).contains(query)) continue;
                 list.addView(notificationAppRow(info, label, working));
@@ -353,6 +355,16 @@ public class MainActivity extends Activity {
         });
         dialog.setOnDismissListener(ignored -> notificationDialog = null);
         dialog.show();
+        if (notificationApplicationsCache != null) {
+            applications.addAll(notificationApplicationsCache);
+            if (!disabled && allSelected) {
+                for (ApplicationInfo info : applications) working.add(info.packageName);
+            }
+            enableAll.setEnabled(true);
+            disableAll.setEnabled(true);
+            rebuild.run();
+            return;
+        }
         // Package enumeration and icon metadata are deliberately off the UI
         // thread. The dialog becomes visible immediately instead of flashing
         // the previous screen or opening twice after a long pause.
@@ -366,6 +378,9 @@ public class MainActivity extends Activity {
                         && packageManager.getLaunchIntentForPackage(info.packageName) == null) {
                     continue;
                 }
+                notificationLabelsCache.put(info.packageName,
+                        String.valueOf(packageManager.getApplicationLabel(info)));
+                notificationIconsCache.put(info.packageName, info.loadIcon(packageManager));
                 loaded.add(info);
             }
             Collections.sort(loaded, Comparator
@@ -375,6 +390,7 @@ public class MainActivity extends Activity {
                             .getApplicationLabel(info)).toLowerCase(Locale.ROOT)));
             runOnUiThread(() -> {
                 if (notificationDialog == null || !notificationDialog.isShowing()) return;
+                notificationApplicationsCache = new ArrayList<>(loaded);
                 applications.addAll(loaded);
                 if (!disabled && allSelected) {
                     for (ApplicationInfo info : applications) working.add(info.packageName);
@@ -392,7 +408,9 @@ public class MainActivity extends Activity {
         row.setPadding(dp(4), dp(7), 0, dp(7));
 
         ImageView icon = new ImageView(this);
-        icon.setImageDrawable(info.loadIcon(getPackageManager()));
+        Drawable cachedIcon = notificationIconsCache.get(info.packageName);
+        icon.setImageDrawable(cachedIcon != null
+                ? cachedIcon : info.loadIcon(getPackageManager()));
         row.addView(icon, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         LinearLayout names = new LinearLayout(this);
@@ -469,6 +487,34 @@ public class MainActivity extends Activity {
         });
         box.addView(style, new LinearLayout.LayoutParams(-1, -2));
         addPreferenceSlider(box, preferences, getString(R.string.visualizer_speed), VISUALIZER_SPEED, 50, 200, 100);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(8);
+        root.addView(box, params);
+    }
+
+    private void addNotificationAnimationControl(LinearLayout root, SharedPreferences preferences) {
+        LinearLayout box = card();
+        TextView title = text(getString(R.string.notification_style), 12, Color.rgb(175, 175, 175));
+        title.setLetterSpacing(0.10f);
+        box.addView(title);
+        Spinner style = new Spinner(this);
+        String[] styles = {getString(R.string.notification_style_breathe),
+                getString(R.string.notification_style_radar),
+                getString(R.string.notification_style_orbit),
+                getString(R.string.notification_style_spiral),
+                getString(R.string.notification_style_diagonal)};
+        style.setAdapter(new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item, styles));
+        style.setSelection(Math.min(styles.length - 1,
+                Math.max(0, preferences.getInt(NOTIFICATION_STYLE, 0))));
+        style.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view,
+                    int position, long id) {
+                preferences.edit().putInt(NOTIFICATION_STYLE, position).apply();
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
+        box.addView(style, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.topMargin = dp(8);
         root.addView(box, params);

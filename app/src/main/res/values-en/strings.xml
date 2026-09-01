@@ -27,6 +27,7 @@ Interface</string>
     <string name="brightness_notifications">NOTIFICATION BRIGHTNESS</string>
     <string name="brightness_flash">NOTIFICATION FLASH</string>
     <string name="large_clock">LARGE CLOCK WHEN NOT CHARGING</string>
+    <string name="compact_charging_battery">USE COMPACT BAR WHILE CHARGING</string>
     <string name="notification_access">ALLOW NOTIFICATIONS</string>
     <string name="open_glyph_toys">OPEN GLYPH TOYS</string>
     <string name="profiles_title">PROFILE</string>
@@ -42,5 +43,11 @@ Interface</string>
     <string name="visualizer_wave">WAVE</string>
     <string name="visualizer_pulse">PULSE</string>
     <string name="visualizer_speed">SPEED</string>
+    <string name="notification_style">NOTIFICATION ANIMATION</string>
+    <string name="notification_style_breathe">BREATHING CIRCLE</string>
+    <string name="notification_style_radar">RADIAL PULSE</string>
+    <string name="notification_style_orbit">ORBIT</string>
+    <string name="notification_style_spiral">SPIRAL</string>
+    <string name="notification_style_diagonal">DIAGONAL WAVE</string>
     <string name="author_credit">Created by @feneksx</string>
 </resources>
