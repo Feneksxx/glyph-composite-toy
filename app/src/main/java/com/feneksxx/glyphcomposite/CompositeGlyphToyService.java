@@ -517,9 +517,12 @@ public class CompositeGlyphToyService extends Service {
         }
 
         if (batteryCharging) {
-            // Charging remains animated, but a sleeping screen needs only a
-            // very occasional update for its deliberately gentle animation.
-            return powerSave ? 650L : (screenInteractive ? 250L : 900L);
+            // Both the travelling charging highlight and the full-charge
+            // breathing state need regular frames. The identical-frame guard
+            // below still prevents any extra binder work when a frame does
+            // not visibly change.
+            return powerSave ? POWER_SAVE_ANIMATION_FRAME_DELAY_MS
+                    : ANIMATION_FRAME_DELAY_MS;
         }
 
         long untilNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L);
