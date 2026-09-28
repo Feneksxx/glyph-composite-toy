@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Used only for the short notification-animation window. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Required so the notification picker can list installed user apps. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <application android:theme="@style/AppTheme" android:label="@string/app_name"
@@ -10,7 +11,7 @@
                 <action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name=".CompositeGlyphToyService" android:exported="true" android:label="Glyph Composite">
+        <service android:name=".CompositeGlyphToyService" android:exported="true" android:label="@string/app_name">
             <intent-filter><action android:name="com.nothing.glyph.TOY" /></intent-filter>
             <meta-data android:name="com.nothing.glyph.toy.name" android:resource="@string/toy_name" />
             <meta-data android:name="com.nothing.glyph.toy.image" android:resource="@drawable/toy_preview" />
@@ -18,7 +19,7 @@
             <meta-data android:name="com.nothing.glyph.toy.longpress" android:value="1" />
             <meta-data android:name="com.nothing.glyph.toy.aod_support" android:value="1" />
         </service>
-        <service android:name=".GlyphNotificationListener" android:label="Glyph Composite notifications" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
+        <service android:name=".GlyphNotificationListener" android:label="@string/app_name" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
         </service>
     </application>

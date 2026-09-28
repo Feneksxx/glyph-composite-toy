@@ -1,9 +1,5 @@
 package com.feneksxx.glyphcomposite;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-
 /**
  * Exact Phone (3) LED allocation, generated from the official
  * "Phone 3 Glyph Matrix LED allocation.svg" included with GDK 1.1.
@@ -38,42 +34,21 @@ final class Phone3LedLayout {
         "0000000001111111000000000"
     };
 
-    static final Set<Integer> VALID_LEDS = createValidSet();
-    static final Set<Integer> EDGE_RING = computeEdgeRing(VALID_LEDS);
+    private static final boolean[][] VALID_LEDS = createLedMap();
 
     private Phone3LedLayout() { }
 
-    static boolean isValid(int x, int y) { return VALID_LEDS.contains(key(x, y)); }
+    static boolean isValid(int x, int y) {
+        return x >= 0 && x < 25 && y >= 0 && y < 25 && VALID_LEDS[y][x];
+    }
 
-    private static Set<Integer> createValidSet() {
-        Set<Integer> result = new HashSet<>();
+    private static boolean[][] createLedMap() {
+        boolean[][] result = new boolean[25][25];
         for (int y = 0; y < SDK_ALLOCATION.length; y++) {
             for (int x = 0; x < SDK_ALLOCATION[y].length(); x++) {
-                if (SDK_ALLOCATION[y].charAt(x) == '1') result.add(key(x, y));
+                result[y][x] = SDK_ALLOCATION[y].charAt(x) == '1';
             }
         }
-        return Collections.unmodifiableSet(result);
+        return result;
     }
-
-    /** A valid LED is on the outline when one of its four direct neighbours is absent. */
-    private static Set<Integer> computeEdgeRing(Set<Integer> ledSet) {
-        Set<Integer> result = new HashSet<>();
-        for (int point : ledSet) {
-            int x = point % 25;
-            int y = point / 25;
-            if (!contains(ledSet, x + 1, y) || !contains(ledSet, x - 1, y)
-                    || !contains(ledSet, x, y + 1) || !contains(ledSet, x, y - 1)) {
-                result.add(point);
-            }
-        }
-        return Collections.unmodifiableSet(result);
-    }
-
-    private static boolean contains(Set<Integer> ledSet, int x, int y) {
-        return x >= 0 && x < 25 && y >= 0 && y < 25 && ledSet.contains(key(x, y));
-    }
-
-    static int key(int x, int y) { return y * 25 + x; }
-    static int x(int point) { return point % 25; }
-    static int y(int point) { return point / 25; }
 }

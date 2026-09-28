@@ -7,3 +7,5 @@ local.properties
 *.iml
 app/libs/*.aar
 local-debug.keystore
+# Local Gradle runtime selection; the wrapper files above remain tracked.
+gradle/gradle-daemon-jvm.properties

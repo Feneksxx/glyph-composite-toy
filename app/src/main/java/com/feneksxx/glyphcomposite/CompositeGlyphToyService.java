@@ -13,10 +13,14 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.media.AudioManager;
 import android.os.BatteryManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.util.Log;
+
+import java.util.Arrays;
 
 import com.nothing.ketchum.Glyph;
 import com.nothing.ketchum.GlyphException;
@@ -26,6 +30,11 @@ import com.nothing.ketchum.GlyphMatrixObject;
 
 /** One-screen Glyph Toy: clock, notification dot, charging icon and bottom music visualizer. */
 public class CompositeGlyphToyService extends Service {
+    private static final String TAG = "GlyphCompositeToy";
+    public static final String ACTION_RENDER_TEST_NOTIFICATION =
+            "com.feneksxx.glyphcomposite.RENDER_TEST_NOTIFICATION";
+    public static final String ACTION_RENDER_NOTIFICATION =
+            "com.feneksxx.glyphcomposite.RENDER_NOTIFICATION";
     private static final String PREFS = "glyph_composite";
     private static final String CLOCK_BRIGHTNESS = "clock_brightness";
     private static final String MUSIC_BRIGHTNESS = "music_brightness";
@@ -37,6 +46,8 @@ public class CompositeGlyphToyService extends Service {
     private static final String LARGE_CLOCK = "large_clock";
     private static final String CLOCK_FONT = "clock_font";
     private static final String VISUALIZER_ENABLED = "visualizer_enabled";
+    private static final String VISUALIZER_SCREEN_ON = "visualizer_screen_on";
+    private static final String VISUALIZER_SCREEN_OFF = "visualizer_screen_off";
     private static final String VISUALIZER_STYLE = "visualizer_style";
     private static final String VISUALIZER_SPEED = "visualizer_speed";
     private static final String NOTIFICATION_STYLE = "notification_style";
@@ -55,17 +66,45 @@ public class CompositeGlyphToyService extends Service {
         {7,4,4,7,5,5,7}, {7,1,1,1,1,1,1},
         {7,5,5,7,5,5,7}, {7,5,5,7,1,1,7}
     };
+    private static final int[] VISUALIZER_BARS = {6, 8, 10, 12, 14, 16, 18};
+    private static final int[] VOLUME_Y_LEVELS =
+            {12, 11, 13, 10, 14, 9, 15, 8, 16, 7, 17};
+    private static final int[][] NOTIFICATION_RADAR_POINTS =
+            {{12, 3}, {13, 4}, {12, 5}, {11, 4}};
+    private static final int[][] NOTIFICATION_ORBIT_POINTS =
+            {{11, 3}, {12, 3}, {13, 3}, {13, 4},
+                    {13, 5}, {12, 5}, {11, 5}, {11, 4}};
+    private static final int[][] NOTIFICATION_SPIRAL_PATH =
+            {{11, 3}, {12, 3}, {13, 3}, {13, 4},
+                    {13, 5}, {12, 5}, {11, 5}, {11, 4}};
+    private static final int[][] NOTIFICATION_DIAGONAL_POINTS =
+            {{11, 3}, {12, 3}, {11, 4}, {13, 3}, {12, 4},
+                    {11, 5}, {13, 4}, {12, 5}, {13, 5}};
+    private static final int[] NOTIFICATION_DIAGONAL_LEVELS =
+            {0, 1, 1, 2, 2, 2, 3, 3, 4};
+    private static final int[][] NOTIFICATION_FIGURE_EIGHT_PATH =
+            {{11, 3}, {12, 3}, {13, 3}, {13, 4}, {12, 4},
+                    {11, 4}, {11, 5}, {12, 5}, {13, 5}, {12, 4}};
+    private static final java.text.SimpleDateFormat CLOCK_FORMAT =
+            new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
 
     private final Paint pixelPaint = new Paint();
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private GlyphMatrixManager manager;
+    private Bitmap matrixBitmap;
+    private Canvas matrixCanvas;
+    // Reused buffers let the service avoid sending an identical 25x25 frame
+    // to the Glyph binder when only static content is visible.
+    private final int[] currentFramePixels = new int[25 * 25];
+    private final int[] submittedFramePixels = new int[25 * 25];
+    private boolean hasSubmittedFrame;
+    private volatile GlyphMatrixManager manager;
     private AudioManager audioManager;
     private PowerManager powerManager;
+    private PowerManager.WakeLock notificationWakeLock;
     private SharedPreferences preferences;
     private float visualizerEnvelope = 0f;
     private long visualizerStartNanos = 0L;
     private long batteryAnimationStartNanos = 0L;
-    private final float[] visualizerLevels = new float[7];
     private int lastMusicVolume = -1;
     private long volumeIndicatorUntil = 0L;
     private float dotVolumeFrom = 0f;
@@ -73,6 +112,92 @@ public class CompositeGlyphToyService extends Service {
     private float dotVolumeLevel = 0f;
     private long dotVolumeAnimationStarted = 0L;
     private static final long DOT_VOLUME_ANIMATION_MS = 140L;
+    // The Matrix service remains smooth at this cadence without building a
+    // binder queue (20 FPS notifications could visibly stall mid-animation).
+    private static final long ANIMATION_FRAME_DELAY_MS = 80L;
+    private static final long POWER_SAVE_ANIMATION_FRAME_DELAY_MS = 111L;
+    // Android can suspend an idle Glyph Toy between the first and second
+    // animation frame. This is a bounded safety window, not a permanent lock.
+    private static final long NOTIFICATION_WAKE_LOCK_MS = 12_000L;
+    private int batteryLevel;
+    private boolean batteryCharging;
+    private boolean screenInteractive;
+    private boolean audioPlaybackCallbackRegistered;
+    private volatile boolean glyphConnected;
+    private volatile boolean glyphInitInProgress;
+    private volatile boolean managerInitialized;
+    private volatile long managerGeneration;
+    private volatile boolean serviceDestroyed;
+    private boolean volumeReceiverRegistered;
+    private boolean testReceiverRegistered;
+    private boolean batteryReceiverRegistered;
+    private boolean screenReceiverRegistered;
+    private boolean timeTickReceiverRegistered;
+    private long nextManagerReconnectAt;
+    private int lastPixelColor = Integer.MIN_VALUE;
+    private long cachedClockMinute = Long.MIN_VALUE;
+    private String cachedClockText = "";
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener =
+            (sharedPreferences, key) -> requestRenderNow();
+
+    private final AudioManager.AudioPlaybackCallback audioPlaybackCallback =
+            new AudioManager.AudioPlaybackCallback() {
+                @Override public void onPlaybackConfigChanged(
+                        java.util.List<android.media.AudioPlaybackConfiguration> configs) {
+                    // Android tells us when playback starts or stops, so the
+                    // idle service does not need to poll music state.
+                    requestRenderNow();
+                }
+            };
+
+    private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            batteryLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, batteryLevel);
+            int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
+            boolean wasCharging = batteryCharging;
+            batteryCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == BatteryManager.BATTERY_STATUS_FULL;
+            if (!wasCharging && batteryCharging) {
+                batteryAnimationStartNanos = System.nanoTime();
+            } else if (wasCharging && !batteryCharging) {
+                batteryAnimationStartNanos = 0L;
+            }
+            requestRenderNow();
+        }
+    };
+
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            screenInteractive = powerManager != null && powerManager.isInteractive();
+            if (Intent.ACTION_SCREEN_ON.equals(intent.getAction())
+                    && !glyphConnected && !glyphInitInProgress) {
+                // The Glyph manager can lose its binder while the display is
+                // waking. Re-request the connection instead of rendering
+                // through a stale manager instance.
+                initGlyph();
+            }
+            requestRenderNow();
+        }
+    };
+
+    private final BroadcastReceiver timeTickReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_TIME_TICK.equals(intent.getAction())) {
+                // ACTION_TIME_TICK is delivered by Android once per minute,
+                // including while the display is off. Render immediately so
+                // the Glyph clock does not wait for the next screen wake-up.
+                cachedClockMinute = Long.MIN_VALUE;
+                // Re-read the sticky battery state on the same low-frequency
+                // tick. This keeps the clock and battery in sync even when
+                // Android batches the regular battery broadcast.
+                Intent battery = registerReceiver(null,
+                        new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                if (battery != null) batteryReceiver.onReceive(CompositeGlyphToyService.this, battery);
+                requestRenderNow();
+            }
+        }
+    };
 
     private final BroadcastReceiver volumeReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -85,66 +210,236 @@ public class CompositeGlyphToyService extends Service {
         }
     };
 
+    private final BroadcastReceiver testNotificationReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            keepNotificationAnimationAwake();
+            requestRenderNow();
+        }
+    };
+
     private final Runnable loop = new Runnable() {
         @Override public void run() {
-            renderFrame();
-            handler.postDelayed(this, nextFrameDelayMs());
+            if (serviceDestroyed) return;
+            long delay = 1500L;
+            try {
+                if (glyphConnected) {
+                    renderFrame();
+                    delay = nextFrameDelayMs();
+                } else if (!glyphInitInProgress && !managerInitialized
+                        && System.currentTimeMillis() >= nextManagerReconnectAt) {
+                    nextManagerReconnectAt = System.currentTimeMillis() + 1500L;
+                    initGlyph();
+                }
+            } catch (RuntimeException error) {
+                // One bad frame must not terminate the Handler loop and leave
+                // the Glyph looking permanently switched off.
+                Log.e(TAG, "Frame failed; retrying", error);
+                delay = 500L;
+            }
+            if (!serviceDestroyed) handler.postDelayed(this, delay);
         }
     };
 
     @Override public IBinder onBind(Intent intent) {
-        initGlyph();
+        if (!glyphConnected && !glyphInitInProgress) initGlyph();
         return null;
     }
 
     @Override public void onCreate() {
         super.onCreate();
+        serviceDestroyed = false;
+        pixelPaint.setStyle(Paint.Style.FILL);
+        pixelPaint.setAntiAlias(false);
         registerReceiver(volumeReceiver,
                 new android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION"));
+        volumeReceiverRegistered = true;
+        IntentFilter renderFilter = new IntentFilter(ACTION_RENDER_TEST_NOTIFICATION);
+        renderFilter.addAction(ACTION_RENDER_NOTIFICATION);
+        registerReceiver(testNotificationReceiver, renderFilter, Context.RECEIVER_NOT_EXPORTED);
+        testReceiverRegistered = true;
+        Intent initialBattery = registerReceiver(batteryReceiver,
+                new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        batteryReceiverRegistered = true;
+        if (initialBattery != null) batteryReceiver.onReceive(this, initialBattery);
+        IntentFilter screenFilter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        screenFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        registerReceiver(screenReceiver, screenFilter);
+        screenReceiverRegistered = true;
+        registerReceiver(timeTickReceiver, new IntentFilter(Intent.ACTION_TIME_TICK));
+        timeTickReceiverRegistered = true;
     }
 
     @Override public void onDestroy() {
-        unregisterReceiver(volumeReceiver);
+        serviceDestroyed = true;
+        handler.removeCallbacks(loop);
+        glyphConnected = false;
+        hasSubmittedFrame = false;
+        if (volumeReceiverRegistered) {
+            unregisterReceiver(volumeReceiver);
+            volumeReceiverRegistered = false;
+        }
+        if (testReceiverRegistered) {
+            unregisterReceiver(testNotificationReceiver);
+            testReceiverRegistered = false;
+        }
+        if (batteryReceiverRegistered) {
+            unregisterReceiver(batteryReceiver);
+            batteryReceiverRegistered = false;
+        }
+        if (screenReceiverRegistered) {
+            unregisterReceiver(screenReceiver);
+            screenReceiverRegistered = false;
+        }
+        if (timeTickReceiverRegistered) {
+            unregisterReceiver(timeTickReceiver);
+            timeTickReceiverRegistered = false;
+        }
+        if (preferences != null) preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener);
+        if (audioManager != null && audioPlaybackCallbackRegistered && Build.VERSION.SDK_INT >= 26) {
+            audioManager.unregisterAudioPlaybackCallback(audioPlaybackCallback);
+        }
+        releaseNotificationWakeLock();
+        managerGeneration++;
+        if (manager != null && managerInitialized) {
+            try {
+                manager.unInit();
+            } catch (RuntimeException ignored) {
+                // The system Glyph service may already be gone during teardown.
+            }
+        }
+        managerInitialized = false;
+        manager = null;
+        if (matrixBitmap != null && !matrixBitmap.isRecycled()) matrixBitmap.recycle();
         super.onDestroy();
     }
 
     @Override public boolean onUnbind(Intent intent) {
         handler.removeCallbacks(loop);
-        if (manager != null) manager.unInit();
+        glyphConnected = false;
+        hasSubmittedFrame = false;
+        glyphInitInProgress = false;
+        managerGeneration++;
+        if (manager != null && managerInitialized) {
+            try {
+                manager.unInit();
+            } catch (RuntimeException ignored) {
+                // Safe teardown when Nothing's binder has already disconnected.
+            }
+        }
+        managerInitialized = false;
+        manager = null;
         return false;
     }
 
     private void initGlyph() {
+        if (glyphInitInProgress || managerInitialized) return;
+        glyphInitInProgress = true;
         preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
+        preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener);
+        preferences.registerOnSharedPreferenceChangeListener(preferenceListener);
         if (preferences.getInt(SETTINGS_VERSION, 0) < 1) {
             preferences.edit().putBoolean(LARGE_CLOCK, true)
                     .putInt(SETTINGS_VERSION, 1).apply();
         }
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        manager = GlyphMatrixManager.getInstance(getApplicationContext());
-        manager.init(new GlyphMatrixManager.Callback() {
+        screenInteractive = powerManager != null && powerManager.isInteractive();
+        if (audioManager != null && !audioPlaybackCallbackRegistered && Build.VERSION.SDK_INT >= 26) {
+            audioManager.registerAudioPlaybackCallback(audioPlaybackCallback, handler);
+            audioPlaybackCallbackRegistered = true;
+        }
+        final GlyphMatrixManager connection = GlyphMatrixManager.getInstance(getApplicationContext());
+        final long generation = ++managerGeneration;
+        manager = connection;
+        managerInitialized = true;
+        connection.init(new GlyphMatrixManager.Callback() {
             @Override public void onServiceConnected(ComponentName name) {
-                manager.register(Glyph.DEVICE_23112);
-                handler.removeCallbacks(loop);
-                handler.post(loop);
+                handler.post(() -> {
+                    if (serviceDestroyed || manager != connection
+                            || generation != managerGeneration) return;
+                    try {
+                        connection.register(Glyph.DEVICE_23112);
+                    } catch (RuntimeException ignored) {
+                        glyphInitInProgress = false;
+                        glyphConnected = false;
+                        managerInitialized = false;
+                        if (!serviceDestroyed) handler.post(loop);
+                        return;
+                    }
+                    glyphInitInProgress = false;
+                    glyphConnected = true;
+                    hasSubmittedFrame = false;
+                    // Force a fresh clock value on the first frame after
+                    // startup/reconnect instead of reusing an old cached
+                    // minute from before the Glyph service was rebound.
+                    cachedClockMinute = Long.MIN_VALUE;
+                    handler.removeCallbacks(loop);
+                    handler.post(loop);
+                });
             }
-            @Override public void onServiceDisconnected(ComponentName name) { }
+            @Override public void onServiceDisconnected(ComponentName name) {
+                handler.post(() -> {
+                    if (generation != managerGeneration) return;
+                    glyphInitInProgress = false;
+                    glyphConnected = false;
+                    managerInitialized = false;
+                    hasSubmittedFrame = false;
+                    handler.removeCallbacks(loop);
+                    if (!serviceDestroyed) handler.post(loop);
+                });
+            }
         });
     }
 
+    private void requestRenderNow() {
+        if (manager == null || !glyphConnected) return;
+        handler.removeCallbacks(loop);
+        handler.post(loop);
+    }
+
+    /** Keeps the CPU awake for one complete notification animation only. */
+    private void keepNotificationAnimationAwake() {
+        if (powerManager == null) {
+            powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        }
+        if (powerManager == null) return;
+        try {
+            if (notificationWakeLock == null) {
+                notificationWakeLock = powerManager.newWakeLock(
+                        PowerManager.PARTIAL_WAKE_LOCK, TAG + ":notification-animation");
+                notificationWakeLock.setReferenceCounted(false);
+            }
+            // Timed acquisition is a failsafe even if service teardown is delayed.
+            notificationWakeLock.acquire(NOTIFICATION_WAKE_LOCK_MS);
+        } catch (RuntimeException ignored) {
+            // Devices which reject the lock still use the normal Handler path.
+        }
+    }
+
+    private void releaseNotificationWakeLock() {
+        try {
+            if (notificationWakeLock != null && notificationWakeLock.isHeld()) {
+                notificationWakeLock.release();
+            }
+        } catch (RuntimeException ignored) {
+            // The timed acquisition may have released it already.
+        }
+        notificationWakeLock = null;
+    }
+
     private void renderFrame() {
-        Bitmap bitmap = Bitmap.createBitmap(25, 25, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
+        if (manager == null || !glyphConnected) return;
+        if (matrixBitmap == null || matrixBitmap.isRecycled()) {
+            matrixBitmap = Bitmap.createBitmap(25, 25, Bitmap.Config.ARGB_8888);
+            matrixCanvas = new Canvas(matrixBitmap);
+        }
+        Canvas canvas = matrixCanvas;
+        canvas.drawColor(Color.BLACK);
 
         // Run every frame so the visualizer can also fade out after music stops.
         drawMusicVisualizer(canvas);
-        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        int level = battery == null ? 0 : battery.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
-        int batteryStatus = battery == null ? 0
-                : battery.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
-        boolean charging = batteryStatus == BatteryManager.BATTERY_STATUS_CHARGING
-                || batteryStatus == BatteryManager.BATTERY_STATUS_FULL;
+        int level = batteryLevel;
+        boolean charging = batteryCharging;
         boolean largeClockEnabled = preferences == null
                 || preferences.getBoolean(LARGE_CLOCK, true);
         boolean compactChargingBattery = preferences != null
@@ -169,45 +464,66 @@ public class CompositeGlyphToyService extends Service {
                     : preferences.getInt(NOTIFICATION_STYLE, 0);
             drawNotificationFlash(canvas,
                     Math.round(brightness(NOTIFICATION_FLASH_BRIGHTNESS) * flashAlpha),
-                    notificationStyle);
+                    notificationStyle, GlyphNotificationListener.notificationEndingProgress());
         }
         float dotAlpha = GlyphNotificationListener.notificationDotAlpha();
         if (dotAlpha > 0f) {
             drawPixel(canvas, 12, 4, Math.round(brightness(NOTIFICATION_BRIGHTNESS) * dotAlpha));
         }
 
-        GlyphMatrixObject object = new GlyphMatrixObject.Builder()
-                .setImageSource(bitmap)
-                .setBrightness(180)
-                .build();
-        GlyphMatrixFrame frame = new GlyphMatrixFrame.Builder().addTop(object).build(this);
+        if (!frameChangedSinceLastSubmission()) return;
         try {
-            manager.setMatrixFrame(frame.render());
-        } catch (GlyphException ignored) {
+            GlyphMatrixObject object = new GlyphMatrixObject.Builder()
+                    .setImageSource(matrixBitmap)
+                    // 255 is the SDK's full object brightness. Component
+                    // sliders are already combined into each pixel's RGB
+                    // intensity, so 180 here imposed an unintended global
+                    // ~70% ceiling even when every slider was at 100%.
+                    .setBrightness(255)
+                    .build();
+            GlyphMatrixFrame frame = new GlyphMatrixFrame.Builder().addTop(object).build(this);
+            if (glyphConnected && manager != null) {
+                manager.setMatrixFrame(frame.render());
+                System.arraycopy(currentFramePixels, 0, submittedFramePixels, 0,
+                        currentFramePixels.length);
+                hasSubmittedFrame = true;
+            }
+        } catch (GlyphException | RuntimeException ignored) {
             // A frame may be rejected while Nothing's service is reconnecting.
         }
     }
 
-    /**
-     * Adaptive refresh keeps animations smooth only while something is moving.
-     * An idle clock does not need an 80 ms render loop and can sleep almost a
-     * full second between frames, reducing wakeups and battery use.
-     */
+    private boolean frameChangedSinceLastSubmission() {
+        matrixBitmap.getPixels(currentFramePixels, 0, 25, 0, 0, 25, 25);
+        return !hasSubmittedFrame
+                || !Arrays.equals(currentFramePixels, submittedFramePixels);
+    }
+
+    /** Adaptive refresh: static content wakes only for the next minute tick. */
     private long nextFrameDelayMs() {
         boolean visualizerEnabled = preferences == null
                 || preferences.getBoolean(VISUALIZER_ENABLED, true);
-        if (visualizerEnabled && isVisualizerActive()) return 80L;
-        if (GlyphNotificationListener.shouldShowNotificationFlash()) return 80L;
-        if (System.currentTimeMillis() < volumeIndicatorUntil) return 80L;
+        boolean powerSave = powerManager != null && powerManager.isPowerSaveMode();
+        if (visualizerEnabled && isVisualizerActive()) {
+            return powerSave ? POWER_SAVE_ANIMATION_FRAME_DELAY_MS
+                    : ANIMATION_FRAME_DELAY_MS;
+        }
+        if (GlyphNotificationListener.shouldShowNotificationFlash()) {
+            return powerSave ? POWER_SAVE_ANIMATION_FRAME_DELAY_MS
+                    : ANIMATION_FRAME_DELAY_MS;
+        }
+        if (System.currentTimeMillis() < volumeIndicatorUntil) {
+            return powerSave ? 160L : (screenInteractive ? 80L : 120L);
+        }
 
-        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        int status = battery == null ? 0 : battery.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
-        boolean charging = status == BatteryManager.BATTERY_STATUS_CHARGING
-                || status == BatteryManager.BATTERY_STATUS_FULL;
-        if (charging) return 120L;
+        if (batteryCharging) {
+            // Charging remains animated, but a sleeping screen needs only a
+            // very occasional update for its deliberately gentle animation.
+            return powerSave ? 650L : (screenInteractive ? 250L : 900L);
+        }
 
-        // The clock and a stable notification dot only need a slow refresh.
-        return 900L;
+        long untilNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L);
+        return Math.max(1_000L, untilNextMinute + 30L);
     }
 
     private void drawMusicVisualizer(Canvas canvas) {
@@ -235,9 +551,8 @@ public class CompositeGlyphToyService extends Service {
         int style = preferences == null ? 0 : preferences.getInt(VISUALIZER_STYLE, 0);
         // A stable dim ribbon follows the real lower arc of the matrix.
         // Seven fixed equalizer bars read clearly as music and never spawn randomly.
-        int[] bars = {6, 8, 10, 12, 14, 16, 18};
-        for (int i = 0; i < bars.length; i++) {
-            int x = bars[i];
+        for (int i = 0; i < VISUALIZER_BARS.length; i++) {
+            int x = VISUALIZER_BARS[i];
             int available = 0;
             for (int y = 21; y <= 24; y++) {
                 if (Phone3LedLayout.isValid(x, y)) available++;
@@ -316,15 +631,24 @@ public class CompositeGlyphToyService extends Service {
         }
     }
 
-    private void drawNotificationFlash(Canvas canvas, int intensity, int style) {
+    private void drawNotificationFlash(Canvas canvas, int intensity, int style,
+            float endingProgress) {
         long now = System.currentTimeMillis();
         float cycle = (now % 1300L) / 1300f;
         if (style == 3) {
-            drawNotificationSpiral(canvas, intensity, cycle);
+            drawNotificationSpiral(canvas, intensity, cycle, endingProgress);
             return;
         }
         if (style == 4) {
             drawNotificationDiagonal(canvas, intensity, cycle);
+            return;
+        }
+        if (style == 5) {
+            drawNotificationCheckerboard(canvas, intensity, cycle, endingProgress > 0f);
+            return;
+        }
+        if (style == 6) {
+            drawNotificationFigureEight(canvas, intensity, cycle, endingProgress > 0f);
             return;
         }
         if (style == 1) {
@@ -348,7 +672,7 @@ public class CompositeGlyphToyService extends Service {
                 float distance = (float) Math.sqrt(dx * dx + dy * dy);
                 float delta = distance - radius;
                 float ring = (float) Math.exp(-(delta * delta) / 0.13f);
-                float amount = 0.07f + ring * 0.78f;
+                float amount = ring * 0.78f;
                 if (dx == 0 && dy == 0) amount = Math.max(amount, 0.72f * centerPulse);
                 int pixelIntensity = Math.min(255, Math.round(intensity * amount));
                 drawPixel(canvas, 12 + dx, 4 + dy, pixelIntensity);
@@ -362,64 +686,132 @@ public class CompositeGlyphToyService extends Service {
         float phase = cycle * (float) (Math.PI * 2.0);
         float pulse = 0.55f + 0.45f * (0.5f + 0.5f * (float) Math.sin(phase));
         drawPixel(canvas, 12, 4, Math.round(intensity * pulse));
-        int[][] points = {{12, 3}, {13, 4}, {12, 5}, {11, 4}};
-        for (int i = 0; i < points.length; i++) {
+        for (int i = 0; i < NOTIFICATION_RADAR_POINTS.length; i++) {
             float local = 0.5f + 0.5f * (float) Math.sin(phase - i * 1.57f);
-            drawPixel(canvas, points[i][0], points[i][1],
-                    Math.round(intensity * (0.18f + 0.72f * Math.max(0f, local))));
+            drawPixel(canvas, NOTIFICATION_RADAR_POINTS[i][0],
+                    NOTIFICATION_RADAR_POINTS[i][1],
+                    Math.round(intensity * (0.72f * Math.max(0f, local))));
         }
     }
 
     private void drawNotificationOrbit(Canvas canvas, int intensity, float cycle) {
         // One bright point makes a compact clockwise orbit with a soft tail.
         float position = cycle * 8f;
-        int[][] ring = {{11, 3}, {12, 3}, {13, 3}, {13, 4},
-                {13, 5}, {12, 5}, {11, 5}, {11, 4}};
-        for (int i = 0; i < ring.length; i++) {
+        for (int i = 0; i < NOTIFICATION_ORBIT_POINTS.length; i++) {
             float distance = Math.abs(position - i);
             distance = Math.min(distance, 8f - distance);
-            float amount = 0.10f + 0.90f * (float) Math.exp(-distance * distance / 1.8f);
-            drawPixel(canvas, ring[i][0], ring[i][1], Math.round(intensity * amount));
+            float amount = 0.90f * (float) Math.exp(-distance * distance / 1.8f);
+            drawPixel(canvas, NOTIFICATION_ORBIT_POINTS[i][0],
+                    NOTIFICATION_ORBIT_POINTS[i][1], Math.round(intensity * amount));
         }
         drawPixel(canvas, 12, 4, Math.round(intensity * 0.32f));
     }
 
-    private void drawNotificationSpiral(Canvas canvas, int intensity, float cycle) {
-        int[][] path = {{11, 3}, {12, 3}, {13, 3}, {13, 4}, {13, 5},
-                {12, 5}, {11, 5}, {11, 4}, {12, 4}};
-        float position = cycle * 18f;
-        for (int i = 0; i < path.length; i++) {
+    private void drawNotificationSpiral(Canvas canvas, int intensity, float cycle,
+            float endingProgress) {
+        float position = cycle * NOTIFICATION_SPIRAL_PATH.length;
+        float outerWeight = 1f - Math.max(0f, Math.min(1f, endingProgress));
+        for (int i = 0; i < NOTIFICATION_SPIRAL_PATH.length; i++) {
             float distance = Math.abs(position - i);
-            distance = Math.min(distance, 18f - distance);
-            float amount = 0.04f + 0.96f
-                    * (float) Math.exp(-distance * distance / 1.35f);
-            drawPixel(canvas, path[i][0], path[i][1], Math.round(intensity * amount));
+            distance = Math.min(distance, NOTIFICATION_SPIRAL_PATH.length - distance);
+            float amount = outerWeight * (float) Math.exp(-distance * distance / 1.35f);
+            drawPixel(canvas, NOTIFICATION_SPIRAL_PATH[i][0],
+                    NOTIFICATION_SPIRAL_PATH[i][1], Math.round(intensity * amount));
+        }
+        if (endingProgress > 0f) {
+            float centerWeight = endingProgress * endingProgress
+                    * (3f - 2f * endingProgress);
+            drawPixel(canvas, 12, 4, Math.round(intensity * centerWeight));
         }
     }
 
     private void drawNotificationDiagonal(Canvas canvas, int intensity, float cycle) {
-        int[][] points = {{11, 3}, {12, 3}, {11, 4}, {13, 3}, {12, 4},
-                {11, 5}, {13, 4}, {12, 5}, {13, 5}};
-        int[] diagonal = {0, 1, 1, 2, 2, 2, 3, 3, 4};
-        float position = cycle * 8f;
-        for (int i = 0; i < points.length; i++) {
-            float distance = Math.abs(position - diagonal[i]);
-            float amount = 0.04f + 0.96f
+        // Smooth ping-pong travel: 0 -> 4 -> 0. The cosine easing reaches
+        // both ends with zero velocity, so the wave reverses direction
+        // naturally instead of jumping when the cycle restarts.
+        float position = 2f - 2f * (float) Math.cos(cycle * Math.PI * 2.0);
+        for (int i = 0; i < NOTIFICATION_DIAGONAL_POINTS.length; i++) {
+            float distance = Math.abs(position - NOTIFICATION_DIAGONAL_LEVELS[i]);
+            float amount = 0.96f
                     * (float) Math.exp(-distance * distance / 0.70f);
-            drawPixel(canvas, points[i][0], points[i][1], Math.round(intensity * amount));
+            drawPixel(canvas, NOTIFICATION_DIAGONAL_POINTS[i][0],
+                    NOTIFICATION_DIAGONAL_POINTS[i][1], Math.round(intensity * amount));
+        }
+    }
+
+    private void drawNotificationCheckerboard(Canvas canvas, int intensity, float cycle,
+            boolean ending) {
+        // Centre + corners and the four sides alternate at a fixed rhythm.
+        if (ending) {
+            int corner = Math.round(intensity * 0.55f);
+            drawPixel(canvas, 12, 4, intensity);
+            drawPixel(canvas, 11, 3, corner);
+            drawPixel(canvas, 13, 3, corner);
+            drawPixel(canvas, 11, 5, corner);
+            drawPixel(canvas, 13, 5, corner);
+            return;
+        }
+        boolean primary = cycle < 0.5f;
+        int bright = intensity;
+        int dim = 0;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                boolean primaryCell = (dx + dy) % 2 == 0;
+                drawPixel(canvas, 12 + dx, 4 + dy,
+                        primaryCell == primary ? bright : dim);
+            }
+        }
+    }
+
+    private void drawNotificationFigureEight(Canvas canvas, int intensity, float cycle,
+            boolean ending) {
+        if (ending) {
+            drawPixel(canvas, 12, 4, Math.min(255, Math.round(intensity * 1.25f)));
+            return;
+        }
+        // The centre is visited twice every loop: upper loop -> centre ->
+        // lower loop -> centre. A soft tail keeps the route continuous.
+        float position = cycle * NOTIFICATION_FIGURE_EIGHT_PATH.length;
+        for (int i = 0; i < NOTIFICATION_FIGURE_EIGHT_PATH.length; i++) {
+            float distance = Math.abs(position - i);
+            distance = Math.min(distance, NOTIFICATION_FIGURE_EIGHT_PATH.length - distance);
+            float amount = 0.94f
+                    * (float) Math.exp(-distance * distance / 1.05f);
+            drawPixel(canvas, NOTIFICATION_FIGURE_EIGHT_PATH[i][0],
+                    NOTIFICATION_FIGURE_EIGHT_PATH[i][1], Math.round(intensity * amount));
         }
     }
 
     private boolean isVisualizerActive() {
-        return audioManager != null
-                && audioManager.isMusicActive()
-                && powerManager != null
-                && powerManager.isInteractive();
+        boolean enabled = preferences == null
+                || preferences.getBoolean(VISUALIZER_ENABLED, true);
+        boolean screenAllowed = screenInteractive
+                ? preferences == null || preferences.getBoolean(VISUALIZER_SCREEN_ON, true)
+                : preferences == null || preferences.getBoolean(VISUALIZER_SCREEN_OFF, true);
+        return enabled && screenAllowed && audioManager != null && isMusicPlayingNow();
+    }
+
+    private boolean isMusicPlayingNow() {
+        if (!audioManager.isMusicActive()) return false;
+        if (screenInteractive || Build.VERSION.SDK_INT < 26) return true;
+        try {
+            java.util.List<android.media.AudioPlaybackConfiguration> active =
+                    audioManager.getActivePlaybackConfigurations();
+            return active != null && !active.isEmpty();
+        } catch (RuntimeException ignored) {
+            // Some system builds restrict this list; isMusicActive() remains
+            // the safe fallback rather than allowing the visualizer to crash.
+            return true;
+        }
     }
 
     private void drawClock(Canvas canvas, boolean charging) {
-        String time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-                .format(new java.util.Date());
+        long minute = System.currentTimeMillis() / 60_000L;
+        if (minute != cachedClockMinute) {
+            cachedClockMinute = minute;
+            cachedClockText = CLOCK_FORMAT.format(new java.util.Date(minute * 60_000L));
+        }
+        String time = cachedClockText;
         int intensity = brightness(CLOCK_BRIGHTNESS);
         int font = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
         boolean large = !charging && preferences != null
@@ -533,11 +925,20 @@ public class CompositeGlyphToyService extends Service {
     private void drawBattery(Canvas canvas, int level, boolean charging) {
         int left = 8, right = 16, top = 14, bottom = 18;
         int intensity = brightness(BATTERY_BRIGHTNESS);
-        double seconds = (System.nanoTime() - visualizerStartNanos) / 1_000_000_000.0;
-        // During normal discharge the battery outline is static. Only the
-        // charging states are allowed to animate below.
+        if (charging && batteryAnimationStartNanos == 0L) {
+            batteryAnimationStartNanos = System.nanoTime();
+        }
+        double seconds = charging
+                ? (System.nanoTime() - batteryAnimationStartNanos) / 1_000_000_000.0
+                : 0.0;
+        // During normal discharge the battery outline is static. A full
+        // battery uses one calm breathing brightness instead of the moving
+        // highlight used during ordinary charging.
         int outline = intensity;
-        if (charging) {
+        boolean full = charging && level >= 100;
+        if (full) {
+            outline = fullChargePulseIntensity(intensity, seconds, 0.68f);
+        } else if (charging) {
             int pulse = Math.round(35f
                     * (0.5f + 0.5f * (float) Math.sin(seconds * Math.PI * 2.0)));
             outline = Math.min(255, intensity + pulse);
@@ -548,16 +949,16 @@ public class CompositeGlyphToyService extends Service {
         drawPixel(canvas, 17, 16, outline);
         drawPixel(canvas, 17, 17, outline);
         int filledColumns = Math.round(Math.max(0, Math.min(100, level)) / 100f * 7);
-        if (charging && level >= 100) {
-            float fullWave = 0.5f + 0.5f
-                    * (float) Math.sin(seconds * Math.PI * 1.6);
-            int fullIntensity = Math.min(255, intensity + Math.round(55f * fullWave));
+        if (full) {
+            // Full charge is deliberately still: all pixels breathe together
+            // so it cannot be confused with the travelling charge highlight.
+            int fullIntensity = fullChargePulseIntensity(intensity, seconds, 0.76f);
             for (int x = left + 1; x < right; x++) {
                 for (int y = 15; y <= 17; y++) {
                     drawPixel(canvas, x, y, fullIntensity);
                 }
             }
-            int contact = Math.min(255, intensity + Math.round(80f * fullWave));
+            int contact = fullChargePulseIntensity(intensity, seconds, 0.84f);
             drawPixel(canvas, 17, 15, contact);
             drawPixel(canvas, 17, 16, contact);
             drawPixel(canvas, 17, 17, contact);
@@ -581,19 +982,57 @@ public class CompositeGlyphToyService extends Service {
 
     private void drawBatteryLevelLine(Canvas canvas, int level, boolean charging) {
         int intensity = brightness(BATTERY_BRIGHTNESS);
-        int dim = Math.max(10, Math.round(intensity * 0.18f));
-        int filled = Math.round(Math.max(0, Math.min(100, level)) / 100f * 7f);
-        for (int x = 0; x < 7; x++) {
-            drawPixel(canvas, 9 + x, 18, x < filled ? intensity : dim);
+        // Keep the unfilled part proportional to the already combined
+        // component + master brightness. A fixed floor here made the dim
+        // pixels ignore the master brightness slider at low settings.
+        int dim = Math.round(intensity * 0.18f);
+        final int lineLeft = 8;
+        final int lineWidth = 9;
+        float pixelHeight = Math.max(0f, Math.min(100, level)) / 100f * lineWidth;
+        int filled = (int) Math.floor(pixelHeight);
+        float fractional = pixelHeight - filled;
+        for (int x = 0; x < lineWidth; x++) {
+            int pixelIntensity = x < filled ? intensity : dim;
+            if (x == filled && fractional > 0.001f) {
+                // The leading pixel represents the fractional part of the
+                // battery percentage instead of jumping by a whole LED.
+                pixelIntensity = Math.max(dim, Math.round(intensity * fractional));
+            }
+            drawPixel(canvas, lineLeft + x, 18, pixelIntensity);
+        }
+        if (charging && level >= 100) {
+            if (batteryAnimationStartNanos == 0L) {
+                batteryAnimationStartNanos = System.nanoTime();
+            }
+            double seconds = (System.nanoTime() - batteryAnimationStartNanos)
+                    / 1_000_000_000.0;
+            // No travelling pixels at 100%: the complete compact bar simply
+            // breathes as one calm indicator of a completed charge.
+            int fullIntensity = fullChargePulseIntensity(intensity, seconds, 0.72f);
+            for (int x = 0; x < lineWidth; x++) {
+                drawPixel(canvas, lineLeft + x, 18, fullIntensity);
+            }
+            return;
         }
         if (charging && filled > 0) {
             if (batteryAnimationStartNanos == 0L) batteryAnimationStartNanos = System.nanoTime();
             double seconds = (System.nanoTime() - batteryAnimationStartNanos) / 1_000_000_000.0;
-            int shine = 1 + (int) Math.floor(seconds * 3.0) % filled;
-            drawPixel(canvas, 9 + shine, 18, Math.min(255, intensity + 80));
+            int shine = (int) Math.floor(seconds * 3.0) % filled;
+            drawPixel(canvas, lineLeft + shine, 18, Math.min(255, intensity + 80));
         } else if (!charging) {
             batteryAnimationStartNanos = 0L;
         }
+    }
+
+    /**
+     * A low-frequency cosine gives the complete-charge state a soft inhale /
+     * exhale without creating a directional sweep. {@code minimum} keeps the
+     * symbol legible throughout the dimmest part of the pulse.
+     */
+    private int fullChargePulseIntensity(int intensity, double seconds, float minimum) {
+        float phase = 0.5f - 0.5f
+                * (float) Math.cos(seconds * Math.PI * 2.0 / 2.4);
+        return Math.max(1, Math.round(intensity * (minimum + (1f - minimum) * phase)));
     }
 
     private void updateVolumeIndicator() {
@@ -636,7 +1075,6 @@ public class CompositeGlyphToyService extends Service {
         int dim = Math.max(8, Math.round(bright * 0.12f));
         float level = current / (float) max * 11f;
         // One straight eleven-pixel line just inside the physical edge.
-        int[] yLevels = {12, 11, 13, 10, 14, 9, 15, 8, 16, 7, 17};
 
         if (dotClock) {
             long elapsed = System.currentTimeMillis() - dotVolumeAnimationStarted;
@@ -650,18 +1088,20 @@ public class CompositeGlyphToyService extends Service {
             } else {
                 dotVolumeLevel = dotVolumeTo;
             }
-            int filled = Math.round(Math.max(0f, Math.min(1f, animatedLevel)) * 7f);
-            int fromFilled = Math.round(dotVolumeFrom * 7f);
-            int targetFilled = Math.round(dotVolumeTo * 7f);
+            // Do not round the seven-pixel bar too early. With sixteen
+            // hardware volume steps, rounding made some button presses look
+            // like they did nothing. A fractional leading pixel gives clear
+            // feedback: first it appears at half brightness, then it becomes
+            // full on the next step.
+            float pixelHeight = Math.max(0f, Math.min(1f, animatedLevel)) * 7f;
+            int filled = (int) Math.floor(pixelHeight);
+            float fractional = pixelHeight - filled;
             for (int i = 0; i < 7; i++) {
                 int y = 15 - i;
                 int intensity = i < filled ? bright : 0;
-                if (dotVolumeAnimationStarted != 0L
-                        && targetFilled > fromFilled && i == fromFilled) {
-                    intensity = Math.max(intensity, Math.round(bright * progress));
-                } else if (dotVolumeAnimationStarted != 0L
-                        && targetFilled < fromFilled && i == targetFilled) {
-                    intensity = Math.max(intensity, Math.round(bright * (1f - progress)));
+                if (i == filled && fractional > 0.01f) {
+                    float stepBrightness = fractional >= 0.5f ? 1f : 0.5f;
+                    intensity = Math.round(bright * stepBrightness);
                 }
                 drawPixel(canvas, 0, y, intensity);
                 drawPixel(canvas, 24, y, intensity);
@@ -676,17 +1116,17 @@ public class CompositeGlyphToyService extends Service {
             // 0..100% range and cannot saturate early.
             float fraction = current / (float) max;
             int edgeIntensity = Math.round(bright * fraction);
-            for (int y : yLevels) {
+            for (int y : VOLUME_Y_LEVELS) {
                 drawPixel(canvas, 0, y, edgeIntensity);
                 drawPixel(canvas, 24, y, edgeIntensity);
             }
             return;
         }
 
-        for (int i = 0; i < yLevels.length; i++) {
+        for (int i = 0; i < VOLUME_Y_LEVELS.length; i++) {
             float fill = Math.max(0f, Math.min(1f, level - i));
             int intensity = Math.round(dim + (bright - dim) * fill);
-            int y = yLevels[i];
+            int y = VOLUME_Y_LEVELS[i];
             drawPixel(canvas, 1, y, intensity);
             drawPixel(canvas, 23, y, intensity);
         }
@@ -739,7 +1179,6 @@ public class CompositeGlyphToyService extends Service {
                 x += 2;
                 continue;
             }
-            int style = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
             int[] rows = fontRows(character - '0');
             int width = 3;
             for (int row = 0; row < 5; row++) {
@@ -761,7 +1200,6 @@ public class CompositeGlyphToyService extends Service {
                 x += 2;
                 continue;
             }
-            int style = preferences == null ? 1 : preferences.getInt(CLOCK_FONT, 1);
             int[] rows = fontRows(character - '0');
             int width = 3;
             for (int row = 0; row < 7; row++) {
@@ -802,7 +1240,7 @@ public class CompositeGlyphToyService extends Service {
         {6,9,9,0,9,9,6}, {0,1,1,0,1,1,0},
         {6,1,1,6,8,8,6}, {6,1,1,6,1,1,6},
         {0,9,9,6,1,1,0}, {6,8,8,6,1,1,6},
-        {6,8,8,6,9,9,6}, {6,1,1,0,1,1,1},
+        {6,8,8,6,9,9,6}, {6,1,1,0,1,1,0},
         {6,9,9,6,9,9,6}, {6,9,9,6,1,1,6}
     };
 
@@ -818,14 +1256,6 @@ public class CompositeGlyphToyService extends Service {
         {15,9,15,9,15}, {15,9,15,1,15}
     };
 
-    private static final int[][] MINIMAL_DIGITS = {
-        {7,5,5,5,7}, {2,2,2,2,2}, {7,1,7,4,7}, {7,1,7,1,7}, {5,5,7,1,1},
-        {7,4,7,1,7}, {7,4,7,5,7}, {7,1,1,1,1}, {7,5,7,5,7}, {7,5,7,1,7}
-    };
-    private static final int[][] THIN_DIGITS = {
-        {2,5,5,5,2}, {2,6,2,2,7}, {6,1,2,4,7}, {6,1,2,1,6}, {5,5,7,1,1},
-        {7,4,6,1,6}, {2,4,6,5,2}, {7,1,2,2,2}, {2,5,2,5,2}, {2,5,3,1,2}
-    };
     private static final int[][] DOT_DIGITS = {
         {2,5,5,5,2}, {2,2,2,2,2}, {6,1,2,4,3}, {6,1,2,1,6}, {5,5,7,1,1},
         {7,4,6,1,6}, {2,4,6,5,2}, {7,1,2,2,2}, {2,5,2,5,2}, {2,5,3,1,2}
@@ -837,9 +1267,11 @@ public class CompositeGlyphToyService extends Service {
 
     private void drawPixel(Canvas canvas, int x, int y, int intensity) {
         if (!Phone3LedLayout.isValid(x, y)) return;
-        pixelPaint.setColor(Color.rgb(intensity, intensity, intensity));
-        pixelPaint.setStyle(Paint.Style.FILL);
-        pixelPaint.setAntiAlias(false);
+        int color = Color.rgb(intensity, intensity, intensity);
+        if (color != lastPixelColor) {
+            pixelPaint.setColor(color);
+            lastPixelColor = color;
+        }
         canvas.drawPoint(x, y, pixelPaint);
     }
 

@@ -19,6 +19,8 @@ Interface</string>
     <string name="notification_apps_search">Поиск приложения</string>
     <string name="notification_apps_enable_all">ВКЛЮЧИТЬ ВСЕ</string>
     <string name="notification_apps_disable_all">ВЫКЛЮЧИТЬ ВСЕ</string>
+    <string name="notification_apps_loading">Загрузка приложений…</string>
+    <string name="notification_test">ПРОВЕРИТЬ УВЕДОМЛЕНИЕ</string>
     <string name="brightness_master">ОБЩАЯ ЯРКОСТЬ</string>
     <string name="brightness_clock">ЯРКОСТЬ ЧАСОВ</string>
     <string name="brightness_music">ЯРКОСТЬ МУЗЫКИ</string>
@@ -39,6 +41,8 @@ Interface</string>
     <string name="font_thin">ТОЧЕЧНЫЙ</string>
     <string name="font_grid">СЕТКА</string>
     <string name="visualizer_enabled">ВКЛЮЧИТЬ ВИЗУАЛАЙЗЕР</string>
+    <string name="visualizer_screen_on">ПОКАЗЫВАТЬ ПРИ ВКЛЮЧЕННОМ ЭКРАНЕ</string>
+    <string name="visualizer_screen_off">ПОКАЗЫВАТЬ ПРИ ВЫКЛЮЧЕННОМ ЭКРАНЕ</string>
     <string name="visualizer_style">СТИЛЬ ВИЗУАЛАЙЗЕРА</string>
     <string name="visualizer_wave">ВОЛНА</string>
     <string name="visualizer_pulse">ПУЛЬС</string>
@@ -49,5 +53,7 @@ Interface</string>
     <string name="notification_style_orbit">ОРБИТА</string>
     <string name="notification_style_spiral">СПИРАЛЬ</string>
     <string name="notification_style_diagonal">ДИАГОНАЛЬНАЯ ВОЛНА</string>
+    <string name="notification_style_checkerboard">ШАХМАТКА</string>
+    <string name="notification_style_figure_eight">ВОСЬМЁРКА</string>
     <string name="author_credit">Created by @feneksx</string>
 </resources>

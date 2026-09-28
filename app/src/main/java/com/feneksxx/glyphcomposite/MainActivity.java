@@ -28,6 +28,7 @@ import android.widget.Spinner;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.app.AlertDialog;
@@ -39,8 +40,8 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "glyph_composite";
@@ -54,6 +55,8 @@ public class MainActivity extends Activity {
     private static final String LARGE_CLOCK = "large_clock";
     private static final String CLOCK_FONT = "clock_font";
     private static final String VISUALIZER_ENABLED = "visualizer_enabled";
+    private static final String VISUALIZER_SCREEN_ON = "visualizer_screen_on";
+    private static final String VISUALIZER_SCREEN_OFF = "visualizer_screen_off";
     private static final String VISUALIZER_STYLE = "visualizer_style";
     private static final String VISUALIZER_SPEED = "visualizer_speed";
     private static final String NOTIFICATION_STYLE = "notification_style";
@@ -66,9 +69,11 @@ public class MainActivity extends Activity {
     private static final int DEFAULT_BRIGHTNESS = 120;
     private static final int DEFAULT_MASTER_BRIGHTNESS = 180;
     private AlertDialog notificationDialog;
+    private volatile boolean activityDestroyed;
+    private volatile Thread notificationAppsLoader;
     private List<ApplicationInfo> notificationApplicationsCache;
-    private final Map<String, String> notificationLabelsCache = new HashMap<>();
-    private final Map<String, Drawable> notificationIconsCache = new HashMap<>();
+    private final Map<String, String> notificationLabelsCache = new ConcurrentHashMap<>();
+    private final Map<String, Drawable> notificationIconsCache = new ConcurrentHashMap<>();
 
     @Override protected void attachBaseContext(Context base) {
         String language = base.getSharedPreferences(PREFS, MODE_PRIVATE)
@@ -78,7 +83,7 @@ public class MainActivity extends Activity {
             return;
         }
         Configuration configuration = new Configuration(base.getResources().getConfiguration());
-        configuration.setLocale(new Locale(language));
+        configuration.setLocale(Locale.forLanguageTag(language));
         super.attachBaseContext(base.createConfigurationContext(configuration));
     }
 
@@ -146,7 +151,10 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams firstButtonParams = new LinearLayout.LayoutParams(-1, dp(52));
         firstButtonParams.topMargin = dp(12);
         Button notificationAccess = actionButton(getString(R.string.notification_access), false);
-        notificationAccess.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        notificationAccess.setOnClickListener(v -> {
+            Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+            if (intent.resolveActivity(getPackageManager()) != null) startActivity(intent);
+        });
         root.addView(notificationAccess, firstButtonParams);
 
         LinearLayout.LayoutParams managerParams = new LinearLayout.LayoutParams(-1, dp(52));
@@ -155,7 +163,7 @@ public class MainActivity extends Activity {
         manager.setOnClickListener(v -> {
             Intent intent = new Intent();
             intent.setComponent(new ComponentName("com.nothing.thirdparty", "com.nothing.thirdparty.matrix.toys.manager.ToysManagerActivity"));
-            startActivity(intent);
+            if (intent.resolveActivity(getPackageManager()) != null) startActivity(intent);
         });
         root.addView(manager, managerParams);
 
@@ -169,6 +177,17 @@ public class MainActivity extends Activity {
         scrollView.setBackgroundColor(Color.BLACK);
         scrollView.addView(root);
         setContentView(scrollView);
+    }
+
+    @Override protected void onDestroy() {
+        activityDestroyed = true;
+        Thread loader = notificationAppsLoader;
+        if (loader != null) loader.interrupt();
+        if (notificationDialog != null && notificationDialog.isShowing()) {
+            notificationDialog.dismiss();
+        }
+        notificationDialog = null;
+        super.onDestroy();
     }
 
     private void addLanguageControl(LinearLayout root, SharedPreferences preferences) {
@@ -286,6 +305,17 @@ public class MainActivity extends Activity {
 
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
+        final boolean[] appsLoading = {true};
+        LinearLayout loading = new LinearLayout(this);
+        loading.setGravity(Gravity.CENTER);
+        loading.setPadding(0, dp(36), 0, dp(36));
+        ProgressBar loadingSpinner = new ProgressBar(this);
+        loading.addView(loadingSpinner, new LinearLayout.LayoutParams(dp(28), dp(28)));
+        TextView loadingText = text(getString(R.string.notification_apps_loading), 13,
+                Color.rgb(175, 175, 175));
+        LinearLayout.LayoutParams loadingTextParams = new LinearLayout.LayoutParams(-2, -2);
+        loadingTextParams.leftMargin = dp(12);
+        loading.addView(loadingText, loadingTextParams);
         ScrollView listScroll = new ScrollView(this);
         listScroll.setFillViewport(true);
         listScroll.addView(list);
@@ -303,6 +333,10 @@ public class MainActivity extends Activity {
         Runnable rebuild = () -> {
             String query = search.getText().toString().trim().toLowerCase(Locale.ROOT);
             list.removeAllViews();
+            if (appsLoading[0]) {
+                list.addView(loading, new LinearLayout.LayoutParams(-1, -2));
+                return;
+            }
             for (ApplicationInfo info : applications) {
                 String label = notificationLabelsCache.containsKey(info.packageName)
                         ? notificationLabelsCache.get(info.packageName)
@@ -355,7 +389,9 @@ public class MainActivity extends Activity {
         });
         dialog.setOnDismissListener(ignored -> notificationDialog = null);
         dialog.show();
+        rebuild.run();
         if (notificationApplicationsCache != null) {
+            appsLoading[0] = false;
             applications.addAll(notificationApplicationsCache);
             if (!disabled && allSelected) {
                 for (ApplicationInfo info : applications) working.add(info.packageName);
@@ -368,11 +404,12 @@ public class MainActivity extends Activity {
         // Package enumeration and icon metadata are deliberately off the UI
         // thread. The dialog becomes visible immediately instead of flashing
         // the previous screen or opening twice after a long pause.
-        new Thread(() -> {
+        Thread loader = new Thread(() -> {
             ArrayList<ApplicationInfo> loaded = new ArrayList<>();
             PackageManager packageManager = getPackageManager();
             for (ApplicationInfo info : packageManager.getInstalledApplications(
                     PackageManager.GET_META_DATA)) {
+                if (Thread.currentThread().isInterrupted() || activityDestroyed) return;
                 if (getPackageName().equals(info.packageName)) continue;
                 if (isSystemApplication(info)
                         && packageManager.getLaunchIntentForPackage(info.packageName) == null) {
@@ -389,9 +426,11 @@ public class MainActivity extends Activity {
                     .thenComparing(info -> String.valueOf(packageManager
                             .getApplicationLabel(info)).toLowerCase(Locale.ROOT)));
             runOnUiThread(() -> {
-                if (notificationDialog == null || !notificationDialog.isShowing()) return;
+                if (activityDestroyed || isFinishing() || isDestroyed()
+                        || notificationDialog == null || !notificationDialog.isShowing()) return;
                 notificationApplicationsCache = new ArrayList<>(loaded);
                 applications.addAll(loaded);
+                appsLoading[0] = false;
                 if (!disabled && allSelected) {
                     for (ApplicationInfo info : applications) working.add(info.packageName);
                 }
@@ -399,7 +438,9 @@ public class MainActivity extends Activity {
                 disableAll.setEnabled(true);
                 rebuild.run();
             });
-        }, "glyph-app-list").start();
+        }, "glyph-app-list");
+        notificationAppsLoader = loader;
+        loader.start();
     }
 
     private View notificationAppRow(ApplicationInfo info, String label, Set<String> working) {
@@ -452,7 +493,8 @@ public class MainActivity extends Activity {
         String[] fonts = {getString(R.string.font_classic), getString(R.string.font_thin),
                 getString(R.string.font_grid)};
         spinner.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, fonts));
-        spinner.setSelection(Math.min(1, preferences.getInt(CLOCK_FONT, 0)));
+        spinner.setSelection(Math.max(0, Math.min(fonts.length - 1,
+                preferences.getInt(CLOCK_FONT, 0))));
         spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
                 preferences.edit().putInt(CLOCK_FONT, position).apply();
@@ -473,6 +515,20 @@ public class MainActivity extends Activity {
         enabled.setChecked(preferences.getBoolean(VISUALIZER_ENABLED, true));
         enabled.setOnCheckedChangeListener((button, checked) -> preferences.edit().putBoolean(VISUALIZER_ENABLED, checked).apply());
         box.addView(enabled);
+        Switch screenOn = new Switch(this);
+        screenOn.setText(getString(R.string.visualizer_screen_on));
+        screenOn.setTextColor(Color.WHITE);
+        screenOn.setChecked(preferences.getBoolean(VISUALIZER_SCREEN_ON, true));
+        screenOn.setOnCheckedChangeListener((button, checked) ->
+                preferences.edit().putBoolean(VISUALIZER_SCREEN_ON, checked).apply());
+        box.addView(screenOn);
+        Switch screenOff = new Switch(this);
+        screenOff.setText(getString(R.string.visualizer_screen_off));
+        screenOff.setTextColor(Color.WHITE);
+        screenOff.setChecked(preferences.getBoolean(VISUALIZER_SCREEN_OFF, true));
+        screenOff.setOnCheckedChangeListener((button, checked) ->
+                preferences.edit().putBoolean(VISUALIZER_SCREEN_OFF, checked).apply());
+        box.addView(screenOff);
         TextView styleTitle = text(getString(R.string.visualizer_style), 12, Color.rgb(175, 175, 175));
         box.addView(styleTitle);
         Spinner style = new Spinner(this);
@@ -502,7 +558,9 @@ public class MainActivity extends Activity {
                 getString(R.string.notification_style_radar),
                 getString(R.string.notification_style_orbit),
                 getString(R.string.notification_style_spiral),
-                getString(R.string.notification_style_diagonal)};
+                getString(R.string.notification_style_diagonal),
+                getString(R.string.notification_style_checkerboard),
+                getString(R.string.notification_style_figure_eight)};
         style.setAdapter(new ArrayAdapter<String>(this,
                 android.R.layout.simple_spinner_dropdown_item, styles));
         style.setSelection(Math.min(styles.length - 1,
@@ -515,6 +573,16 @@ public class MainActivity extends Activity {
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
         });
         box.addView(style, new LinearLayout.LayoutParams(-1, -2));
+        Button test = actionButton(getString(R.string.notification_test), true);
+        LinearLayout.LayoutParams testParams = new LinearLayout.LayoutParams(-1, dp(44));
+        testParams.topMargin = dp(10);
+        test.setOnClickListener(v -> {
+            GlyphNotificationListener.showTestNotification();
+            Intent render = new Intent(CompositeGlyphToyService.ACTION_RENDER_TEST_NOTIFICATION);
+            render.setPackage(getPackageName());
+            sendBroadcast(render);
+        });
+        box.addView(test, testParams);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.topMargin = dp(8);
         root.addView(box, params);
